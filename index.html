@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Canopia Editor</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="login-card" id="login-card">
+        <div>
+          <p class="eyebrow">Canopia admin</p>
+          <h1>Editar catalogo</h1>
+          <p>Ingreso privado para actualizar productos, precios, stock y revisar compras.</p>
+        </div>
+        <form id="login-form" class="login-form">
+          <label>
+            Contraseña
+            <input id="password" type="password" autocomplete="current-password" required />
+          </label>
+          <button type="submit">Entrar</button>
+          <p id="login-message" class="message"></p>
+        </form>
+      </section>
+
+      <section class="admin" id="admin" hidden>
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Panel privado</p>
+            <h1>Canopia catalogo</h1>
+          </div>
+          <div class="top-actions">
+            <button id="refresh" type="button">Actualizar</button>
+            <button id="logout" type="button">Salir</button>
+          </div>
+        </header>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Productos</h2>
+            <button id="new-product" type="button">Nuevo producto</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th>Categoria</th>
+                  <th>Precio</th>
+                  <th>Stock</th>
+                  <th>Visible</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="products-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Editar</h2>
+            <span id="save-state" class="message"></span>
+          </div>
+          <form id="product-form" class="product-form">
+            <label>ID<input name="id" required placeholder="ej: seda-premium" /></label>
+            <label>Nombre<input name="name" required /></label>
+            <label>Categoria<input name="category" required placeholder="grow, parafernalia, picadores..." /></label>
+            <label>Precio<input name="price" type="number" min="0" step="1" required /></label>
+            <label>Stock<input name="stock" type="number" min="0" step="1" required /></label>
+            <label>Etiqueta<input name="tag" /></label>
+            <label>Imagen URL<input name="image" /></label>
+            <label class="wide">Descripcion<textarea name="description"></textarea></label>
+            <label class="check"><input name="featured" type="checkbox" /> Destacado</label>
+            <label class="check"><input name="visible" type="checkbox" checked /> Visible</label>
+            <button type="submit">Guardar producto</button>
+          </form>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Compras</h2>
+            <span>Ultimos pedidos confirmados desde la web</span>
+          </div>
+          <div id="orders-list" class="orders-list"></div>
+        </section>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

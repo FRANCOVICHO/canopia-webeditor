@@ -1,0 +1,7 @@
+name = "canopia-webeditor"
+pages_build_output_dir = "."
+
+[[d1_databases]]
+binding = "canopia_db"
+database_name = "canopia-db"
+database_id = "a47f1a66-798c-4620-8c0b-36633ad81675"
