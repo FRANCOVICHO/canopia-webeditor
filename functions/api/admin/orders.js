@@ -9,7 +9,7 @@ export async function onRequestGet({ request, env }) {
       `SELECT id, customer_name, customer_phone, customer_note, total, status, items_json, created_at
        FROM orders
        ORDER BY id DESC
-       LIMIT 80`,
+       LIMIT 5`,
     )
     .all();
 
