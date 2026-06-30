@@ -3,90 +3,302 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Canopia Editor</title>
+    <title>Canopia Admin</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <main class="shell">
-      <section class="login-card" id="login-card">
-        <div>
-          <p class="eyebrow">Canopia admin</p>
-          <h1>Editar catalogo</h1>
-          <p>Ingreso privado para actualizar productos, precios, stock y revisar compras.</p>
+
+    <!-- ───────── LOGIN ───────── -->
+    <div class="login-shell" id="login-card">
+      <div class="login-box">
+        <div class="login-logo">
+          <span class="logo-icon">🌿</span>
+          <div>
+            <p class="logo-name">CANOPIA</p>
+            <p class="logo-sub">ADMIN</p>
+          </div>
         </div>
+        <h1 class="login-title">Bienvenido</h1>
+        <p class="login-desc">Ingreso privado para actualizar productos, precios, stock y revisar compras.</p>
         <form id="login-form" class="login-form">
-          <label>
+          <label class="field-label">
             Contraseña
-            <input id="password" type="password" autocomplete="current-password" required />
+            <input id="password" type="password" autocomplete="current-password" required placeholder="••••••••••" />
           </label>
-          <button type="submit">Entrar</button>
+          <button type="submit" class="btn-primary">Entrar</button>
           <p id="login-message" class="message"></p>
         </form>
-      </section>
+      </div>
+    </div>
 
-      <section class="admin" id="admin" hidden>
-        <header class="topbar">
+    <!-- ───────── ADMIN SHELL ───────── -->
+    <div class="app" id="admin" hidden>
+
+      <!-- SIDEBAR -->
+      <aside class="sidebar">
+        <div class="sidebar-logo">
+          <div class="logo-leaf">🌿</div>
           <div>
-            <p class="eyebrow">Panel privado</p>
-            <h1>Canopia catalogo</h1>
+            <p class="logo-name">CANOPIA</p>
+            <p class="logo-sub">ADMIN</p>
           </div>
-          <div class="top-actions">
-            <button id="refresh" type="button">Actualizar</button>
-            <button id="logout" type="button">Salir</button>
+        </div>
+
+        <nav class="sidebar-nav">
+          <a href="#" class="nav-item" data-section="dashboard">
+            <span class="nav-icon">⊞</span> Dashboard
+          </a>
+          <a href="#" class="nav-item active" data-section="products">
+            <span class="nav-icon">🏷</span> Productos
+          </a>
+          <a href="#" class="nav-item" data-section="categories">
+            <span class="nav-icon">▦</span> Categorías
+          </a>
+          <a href="#" class="nav-item" data-section="orders">
+            <span class="nav-icon">📋</span> Pedidos
+          </a>
+          <a href="#" class="nav-item" data-section="clients">
+            <span class="nav-icon">👤</span> Clientes
+          </a>
+          <a href="#" class="nav-item" data-section="inventory">
+            <span class="nav-icon">📦</span> Inventario
+          </a>
+          <a href="#" class="nav-item" data-section="promos">
+            <span class="nav-icon">🏷</span> Promociones
+          </a>
+          <a href="#" class="nav-item" data-section="reports">
+            <span class="nav-icon">📊</span> Reportes
+          </a>
+          <a href="#" class="nav-item" data-section="config">
+            <span class="nav-icon">⚙</span> Configuración
+          </a>
+        </nav>
+
+        <div class="sidebar-user">
+          <div class="user-avatar">CA</div>
+          <div class="user-info">
+            <p class="user-name">Canopia Admin</p>
+            <p class="user-role">Administrador</p>
+          </div>
+          <button id="logout" type="button" class="btn-icon" title="Salir">↩</button>
+        </div>
+      </aside>
+
+      <!-- MAIN CONTENT -->
+      <main class="main-content">
+
+        <!-- TOP BAR -->
+        <header class="topbar">
+          <div class="topbar-title">
+            <nav class="breadcrumb">
+              <span>Inicio</span>
+              <span class="bc-sep">›</span>
+              <span>Productos</span>
+              <span class="bc-sep">›</span>
+              <span class="bc-current">Editar catálogo</span>
+            </nav>
+            <h1>Editar catálogo</h1>
+            <p class="topbar-sub">Gestioná tus productos, precios, stock y más.</p>
+          </div>
+          <div class="topbar-actions">
+            <button id="refresh" type="button" class="btn-ghost">↺ Actualizar</button>
+            <button id="new-product" type="button" class="btn-primary">＋ Nuevo producto</button>
           </div>
         </header>
 
-        <section class="panel">
-          <div class="panel-head">
-            <h2>Productos</h2>
-            <button id="new-product" type="button">Nuevo producto</button>
+        <!-- STATS CARDS -->
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-icon stat-icon--green">🏷</div>
+            <div>
+              <p class="stat-label">Total productos</p>
+              <p class="stat-value" id="stat-total">—</p>
+              <p class="stat-badge badge-green">Activos</p>
+            </div>
           </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Producto</th>
-                  <th>Categoria</th>
-                  <th>Precio</th>
-                  <th>Stock</th>
-                  <th>Visible</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody id="products-body"></tbody>
-            </table>
+          <div class="stat-card">
+            <div class="stat-icon stat-icon--lime">⊕</div>
+            <div>
+              <p class="stat-label">Stock total</p>
+              <p class="stat-value" id="stat-stock">—</p>
+              <p class="stat-badge badge-muted">Unidades</p>
+            </div>
           </div>
-        </section>
+          <div class="stat-card">
+            <div class="stat-icon stat-icon--blue">▦</div>
+            <div>
+              <p class="stat-label">Categorías</p>
+              <p class="stat-value" id="stat-cats">—</p>
+              <p class="stat-badge badge-muted">Activas</p>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon stat-icon--red">🗑</div>
+            <div>
+              <p class="stat-label">Productos sin stock</p>
+              <p class="stat-value" id="stat-nostock">—</p>
+              <p class="stat-badge badge-red">Requieren atención</p>
+            </div>
+          </div>
+        </div>
 
-        <section class="panel">
-          <div class="panel-head">
-            <h2>Editar</h2>
-            <span id="save-state" class="message"></span>
-          </div>
-          <form id="product-form" class="product-form">
-            <label>ID<input name="id" required placeholder="ej: seda-premium" /></label>
-            <label>Nombre<input name="name" required /></label>
-            <label>Categoria<input name="category" required placeholder="grow, parafernalia, picadores..." /></label>
-            <label>Precio<input name="price" type="number" min="0" step="1" required /></label>
-            <label>Stock<input name="stock" type="number" min="0" step="1" required /></label>
-            <label>Etiqueta<input name="tag" /></label>
-            <label>Imagen URL<input name="image" /></label>
-            <label class="wide">Descripcion<textarea name="description"></textarea></label>
-            <label class="check"><input name="featured" type="checkbox" /> Destacado</label>
-            <label class="check"><input name="visible" type="checkbox" checked /> Visible</label>
-            <button type="submit">Guardar producto</button>
-          </form>
-        </section>
+        <!-- PRODUCTS + EDIT PANEL -->
+        <div class="workspace">
 
-        <section class="panel">
+          <!-- PRODUCTS TABLE PANEL -->
+          <section class="panel products-panel">
+            <div class="panel-head">
+              <h2>Productos</h2>
+              <div class="panel-head-actions">
+                <div class="search-wrap">
+                  <span class="search-icon">🔍</span>
+                  <input type="search" id="search-input" placeholder="Buscar producto…" />
+                </div>
+                <button type="button" class="btn-ghost btn-sm">⚙ Filtros</button>
+              </div>
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Producto</th>
+                    <th>Categoría</th>
+                    <th>Precio</th>
+                    <th>Stock</th>
+                    <th>Visible</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="products-body"></tbody>
+              </table>
+            </div>
+
+            <div class="table-footer">
+              <span id="table-count" class="muted-text">Cargando…</span>
+              <div id="pagination" class="pagination"></div>
+            </div>
+          </section>
+
+          <!-- QUICK EDIT PANEL -->
+          <aside class="panel edit-panel">
+            <div class="panel-head">
+              <h2>⚡ Edición rápida</h2>
+              <span id="save-state" class="message"></span>
+            </div>
+
+            <form id="product-form" class="product-form">
+              <div class="field-group">
+                <label class="field-label">
+                  Nombre del producto
+                  <input name="name" required placeholder="Ej: Sustrato Premium 5L" />
+                </label>
+              </div>
+
+              <div class="field-group">
+                <label class="field-label">
+                  ID / Slug
+                  <input name="id" required placeholder="ej: seda-premium" />
+                </label>
+              </div>
+
+              <div class="field-group">
+                <label class="field-label">
+                  Categoría
+                  <div class="select-wrap">
+                    <input name="category" required placeholder="Sustratos, Kits…" />
+                    <span class="select-arrow">∨</span>
+                  </div>
+                </label>
+              </div>
+
+              <div class="field-row">
+                <label class="field-label">
+                  Precio
+                  <div class="input-prefix">
+                    <span>$</span>
+                    <input name="price" type="number" min="0" step="1" required placeholder="0" />
+                  </div>
+                </label>
+                <label class="field-label">
+                  Stock
+                  <div class="input-suffix">
+                    <input name="stock" type="number" min="0" step="1" required placeholder="0" />
+                    <span>unidades</span>
+                  </div>
+                </label>
+              </div>
+
+              <div class="field-group">
+                <label class="field-label toggle-label">
+                  Visible en tienda
+                  <div class="toggle-row">
+                    <label class="toggle">
+                      <input name="visible" type="checkbox" checked />
+                      <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                    </label>
+                    <span class="toggle-hint">Sí, mostrar este producto</span>
+                  </div>
+                </label>
+              </div>
+
+              <div class="field-group">
+                <label class="field-label">
+                  Etiqueta
+                  <input name="tag" placeholder="Nuevo, Oferta…" />
+                </label>
+              </div>
+
+              <div class="field-group">
+                <label class="field-label">
+                  Imagen URL
+                  <input name="image" placeholder="https://…" />
+                </label>
+              </div>
+
+              <div class="field-group">
+                <label class="field-label">
+                  Descripción corta
+                  <textarea name="description" placeholder="Descripción del producto…"></textarea>
+                </label>
+              </div>
+
+              <div class="field-group">
+                <label class="check-label">
+                  <input name="featured" type="checkbox" class="check-input" />
+                  <span class="check-box"></span>
+                  Destacado
+                </label>
+              </div>
+
+              <div class="form-actions">
+                <button type="button" class="btn-ghost" id="cancel-edit">Cancelar</button>
+                <button type="submit" class="btn-primary">Guardar cambios</button>
+              </div>
+            </form>
+          </aside>
+        </div>
+
+        <!-- ORDERS SECTION -->
+        <section class="panel orders-section">
           <div class="panel-head">
-            <h2>Compras</h2>
-            <span>Ultimos pedidos confirmados desde la web</span>
+            <h2>📋 Compras</h2>
+            <div class="panel-head-actions">
+              <button type="button" class="btn-ghost btn-sm">↓ Exportar pedidos</button>
+              <button type="button" class="btn-ghost btn-sm">↑ Importar pedidos</button>
+            </div>
           </div>
           <div id="orders-list" class="orders-list"></div>
         </section>
-      </section>
-    </main>
+
+        <!-- TIP BAR -->
+        <div class="tip-bar">
+          <span class="tip-icon">🌿</span>
+          <p class="tip-text"><strong>Consejo:</strong> Mantené tu catálogo actualizado para brindar la mejor experiencia a tus clientes.</p>
+        </div>
+
+      </main>
+    </div>
 
     <script src="app.js"></script>
   </body>
