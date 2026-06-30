@@ -154,6 +154,8 @@ a { text-decoration: none; color: inherit; }
 /* ════════════════════════════════════════
    APP LAYOUT
 ════════════════════════════════════════ */
+[hidden] { display: none !important; }
+
 .app {
   display: flex;
   min-height: 100vh;
