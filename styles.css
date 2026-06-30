@@ -775,6 +775,115 @@ textarea {
 .order-card p { color: var(--muted); font-size: 12px; margin-top: 3px; }
 
 /* ═══════════════════════
+   NAV SVG ICONS
+═══════════════════════ */
+.nav-svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+.nav-item.active .nav-svg,
+.nav-item:hover .nav-svg { opacity: 1; }
+
+.search-icon-svg {
+  position: absolute;
+  left: 10px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+/* ═══════════════════════
+   DASHBOARD
+═══════════════════════ */
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.dash-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dash-img {
+  width: 100%;
+  height: 80px;
+  border-radius: 6px;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  overflow: hidden;
+}
+
+.dash-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dash-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dash-info strong { font-size: 13px; color: var(--text); }
+
+.dash-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  margin-top: auto;
+}
+
+/* ═══════════════════════
+   CATEGORÍAS
+═══════════════════════ */
+.cat-group {
+  margin-bottom: 1.5rem;
+}
+
+.cat-group:last-child { margin-bottom: 0; }
+
+.cat-group-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ═══════════════════════
+   COMING SOON
+═══════════════════════ */
+.coming-soon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 4rem 2rem;
+  text-align: center;
+}
+
+.coming-icon { font-size: 3rem; }
+.coming-soon h2 { font-size: 1.3rem; color: var(--text); }
+.coming-soon p  { color: var(--muted); font-size: 13px; }
+
+/* ═══════════════════════
    TIP BAR
 ═══════════════════════ */
 .tip-bar {
