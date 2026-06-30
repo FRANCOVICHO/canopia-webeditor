@@ -1,4 +1,4 @@
-const fallbackPassword = "CanopiaGrowtech010626";
+const fallbackPassword = "totoarifrancocanopia2026";
 const sessionKey = "canopia_admin_password";
 const money = new Intl.NumberFormat("es-AR", {
   style: "currency",
