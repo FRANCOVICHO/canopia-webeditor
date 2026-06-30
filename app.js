@@ -316,5 +316,15 @@ document.querySelectorAll(".nav-item").forEach((item) => {
   });
 });
 
-// ─── Auto-login if password cached ───
-if (localStorage.getItem(sessionKey) === fallbackPassword) showAdmin();
+// ─── Auto-login si la contraseña ya fue validada en esta sesión ───
+(async () => {
+  const saved = localStorage.getItem(sessionKey);
+  if (saved) {
+    try {
+      await api("/api/admin/products");
+      showAdmin();
+    } catch {
+      localStorage.removeItem(sessionKey);
+    }
+  }
+})();
