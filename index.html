@@ -43,7 +43,6 @@
             <p class="logo-sub">ADMIN</p>
           </div>
         </div>
-
         <nav class="sidebar-nav">
           <a href="javascript:void(0)" class="nav-item" data-section="dashboard">
             <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
@@ -82,7 +81,6 @@
             Configuración
           </a>
         </nav>
-
         <div class="sidebar-user">
           <div class="user-avatar">CA</div>
           <div class="user-info">
@@ -98,12 +96,11 @@
       <!-- MAIN CONTENT -->
       <main class="main-content">
 
-        <!-- TOP BAR (siempre visible) -->
+        <!-- TOP BAR -->
         <header class="topbar">
           <div class="topbar-title">
             <nav class="breadcrumb">
-              <span>Inicio</span>
-              <span class="bc-sep">›</span>
+              <span>Inicio</span><span class="bc-sep">›</span>
               <span id="bc-section">Productos</span>
             </nav>
             <h1 id="page-title">Editar catálogo</h1>
@@ -115,58 +112,33 @@
           </div>
         </header>
 
-        <!-- ══ SECCIÓN: DASHBOARD ══ -->
+        <!-- ══ DASHBOARD ══ -->
         <div id="section-dashboard" class="section-view" hidden>
           <div class="stats-row">
             <div class="stat-card">
-              <div class="stat-icon stat-icon--green">
-                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M16 3H8l-2 4h12l-2-4z"/></svg>
-              </div>
-              <div>
-                <p class="stat-label">Total productos</p>
-                <p class="stat-value" id="stat-total">—</p>
-                <p class="stat-badge badge-green">Activos</p>
-              </div>
+              <div class="stat-icon stat-icon--green"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M16 3H8l-2 4h12l-2-4z"/></svg></div>
+              <div><p class="stat-label">Total productos</p><p class="stat-value" id="stat-total">—</p><p class="stat-badge badge-green">Activos</p></div>
             </div>
             <div class="stat-card">
-              <div class="stat-icon stat-icon--lime">
-                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
-              </div>
-              <div>
-                <p class="stat-label">Stock total</p>
-                <p class="stat-value" id="stat-stock">—</p>
-                <p class="stat-badge badge-muted">Unidades</p>
-              </div>
+              <div class="stat-icon stat-icon--lime"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div>
+              <div><p class="stat-label">Stock total</p><p class="stat-value" id="stat-stock">—</p><p class="stat-badge badge-muted">Unidades</p></div>
             </div>
             <div class="stat-card">
-              <div class="stat-icon stat-icon--blue">
-                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-              </div>
-              <div>
-                <p class="stat-label">Categorías</p>
-                <p class="stat-value" id="stat-cats">—</p>
-                <p class="stat-badge badge-muted">Activas</p>
-              </div>
+              <div class="stat-icon stat-icon--blue"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div>
+              <div><p class="stat-label">Categorías</p><p class="stat-value" id="stat-cats">—</p><p class="stat-badge badge-muted">Activas</p></div>
             </div>
             <div class="stat-card">
-              <div class="stat-icon stat-icon--red">
-                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-              </div>
-              <div>
-                <p class="stat-label">Sin stock</p>
-                <p class="stat-value" id="stat-nostock">—</p>
-                <p class="stat-badge badge-red">Requieren atención</p>
-              </div>
+              <div class="stat-icon stat-icon--red"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></div>
+              <div><p class="stat-label">Sin stock</p><p class="stat-value" id="stat-nostock">—</p><p class="stat-badge badge-red">Requieren atención</p></div>
             </div>
           </div>
-
           <div class="panel">
-            <div class="panel-head"><h2>Resumen de productos destacados</h2></div>
+            <div class="panel-head"><h2>Productos destacados</h2></div>
             <div id="dashboard-featured"></div>
           </div>
         </div>
 
-        <!-- ══ SECCIÓN: PRODUCTOS ══ -->
+        <!-- ══ PRODUCTOS ══ -->
         <div id="section-products" class="section-view">
           <div class="workspace">
             <section class="panel products-panel">
@@ -181,16 +153,7 @@
               </div>
               <div class="table-wrap">
                 <table>
-                  <thead>
-                    <tr>
-                      <th>Producto</th>
-                      <th>Categoría</th>
-                      <th>Precio</th>
-                      <th>Stock</th>
-                      <th>Visible</th>
-                      <th>Acciones</th>
-                    </tr>
-                  </thead>
+                  <thead><tr><th>Producto</th><th>Categoría</th><th>Precio</th><th>Stock</th><th>Visible</th><th>Acciones</th></tr></thead>
                   <tbody id="products-body"></tbody>
                 </table>
               </div>
@@ -200,6 +163,7 @@
               </div>
             </section>
 
+            <!-- EDIT PANEL -->
             <aside class="panel edit-panel">
               <div class="panel-head">
                 <h2>⚡ Edición rápida</h2>
@@ -216,14 +180,19 @@
                     <input name="id" required placeholder="ej: sustrato-premium-5l" />
                   </label>
                 </div>
+
+                <!-- CATEGORY PICKER -->
                 <div class="field-group">
-                  <label class="field-label">Categoría
-                    <div class="select-wrap">
-                      <input name="category" required placeholder="Sustratos, Kits…" />
+                  <label class="field-label">Categoría</label>
+                  <div class="cat-picker" id="cat-picker">
+                    <div class="cat-picker-input-wrap">
+                      <input name="category" id="cat-input" required placeholder="Seleccioná o escribí…" autocomplete="off" />
                       <span class="select-arrow">∨</span>
                     </div>
-                  </label>
+                    <div class="cat-dropdown" id="cat-dropdown" hidden></div>
+                  </div>
                 </div>
+
                 <div class="field-row">
                   <label class="field-label">Precio
                     <div class="input-prefix">
@@ -238,6 +207,7 @@
                     </div>
                   </label>
                 </div>
+
                 <div class="field-group">
                   <label class="field-label toggle-label">Visible en tienda
                     <div class="toggle-row">
@@ -249,16 +219,27 @@
                     </div>
                   </label>
                 </div>
+
                 <div class="field-group">
                   <label class="field-label">Etiqueta
                     <input name="tag" placeholder="Nuevo, Oferta…" />
                   </label>
                 </div>
+
+                <!-- MULTI-IMAGE UPLOAD -->
                 <div class="field-group">
-                  <label class="field-label">Imagen URL
-                    <input name="image" placeholder="https://…" />
-                  </label>
+                  <span class="field-label" style="margin-bottom:6px">Imágenes</span>
+                  <div class="img-drop-zone" id="img-drop-zone">
+                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--muted)"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    <p>Arrastrá imágenes acá</p>
+                    <p style="font-size:11px;color:var(--muted)">o hacé click para seleccionar</p>
+                    <input type="file" id="img-file-input" accept="image/*" multiple hidden />
+                  </div>
+                  <div class="img-previews" id="img-previews"></div>
+                  <!-- hidden input que guarda las URLs serializadas -->
+                  <input type="hidden" name="image" id="img-hidden" />
                 </div>
+
                 <div class="field-group">
                   <label class="field-label">Descripción corta
                     <textarea name="description" placeholder="Descripción del producto…"></textarea>
@@ -280,92 +261,94 @@
           </div>
         </div>
 
-        <!-- ══ SECCIÓN: CATEGORÍAS ══ -->
+        <!-- ══ CATEGORÍAS ══ -->
         <div id="section-categories" class="section-view" hidden>
-          <div class="panel">
+          <div class="workspace" style="grid-template-columns: 1fr 320px; align-items:start;">
+
+            <!-- Lista de categorías -->
+            <div class="panel">
+              <div class="panel-head">
+                <h2>Categorías</h2>
+                <span class="muted-text" id="cat-count-label"></span>
+              </div>
+              <div id="cat-list-wrap"></div>
+            </div>
+
+            <!-- Crear / editar categoría -->
+            <div class="panel" style="position:sticky;top:1.5rem;">
+              <div class="panel-head"><h2>Nueva categoría</h2></div>
+              <form id="cat-form" class="product-form">
+                <input type="hidden" id="cat-edit-original" value="" />
+                <div class="field-group">
+                  <label class="field-label">Nombre
+                    <input id="cat-name-input" required placeholder="Ej: Sustratos" />
+                  </label>
+                </div>
+                <div class="field-group">
+                  <label class="field-label">Descripción (opcional)
+                    <input id="cat-desc-input" placeholder="Ej: Mezclas para cultivo" />
+                  </label>
+                </div>
+                <div class="form-actions">
+                  <button type="button" class="btn-ghost" id="cat-cancel-btn">Cancelar</button>
+                  <button type="submit" class="btn-primary" id="cat-submit-btn">Crear categoría</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- Productos por categoría (vista expandida) -->
+          <div class="panel" style="margin-top:1rem;">
             <div class="panel-head"><h2>Productos por categoría</h2></div>
             <div id="categories-body"></div>
           </div>
         </div>
 
-        <!-- ══ SECCIÓN: PEDIDOS ══ -->
+        <!-- ══ PEDIDOS ══ -->
         <div id="section-orders" class="section-view" hidden>
           <div class="panel">
-            <div class="panel-head">
-              <h2>Pedidos recientes</h2>
-            </div>
+            <div class="panel-head"><h2>Pedidos recientes</h2></div>
             <div id="orders-list" class="orders-list"></div>
           </div>
         </div>
 
-        <!-- ══ SECCIÓN: CLIENTES ══ -->
+        <!-- ══ CLIENTES ══ -->
         <div id="section-clients" class="section-view" hidden>
           <div class="panel">
             <div class="panel-head"><h2>Clientes de pedidos</h2></div>
             <div class="table-wrap">
               <table>
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Nombre</th>
-                    <th>Teléfono</th>
-                    <th>Total comprado</th>
-                    <th>Fecha</th>
-                  </tr>
-                </thead>
+                <thead><tr><th>#</th><th>Nombre</th><th>Teléfono</th><th>Total</th><th>Fecha</th></tr></thead>
                 <tbody id="clients-body"></tbody>
               </table>
             </div>
           </div>
         </div>
 
-        <!-- ══ SECCIÓN: INVENTARIO ══ -->
+        <!-- ══ INVENTARIO ══ -->
         <div id="section-inventory" class="section-view" hidden>
           <div class="panel">
             <div class="panel-head"><h2>Inventario — Stock por producto</h2></div>
             <div class="table-wrap">
               <table>
-                <thead>
-                  <tr>
-                    <th>Producto</th>
-                    <th>Categoría</th>
-                    <th>Stock</th>
-                    <th>Estado</th>
-                    <th>Precio</th>
-                  </tr>
-                </thead>
+                <thead><tr><th>Producto</th><th>Categoría</th><th>Stock</th><th>Estado</th><th>Precio</th></tr></thead>
                 <tbody id="inventory-body"></tbody>
               </table>
             </div>
           </div>
         </div>
 
-        <!-- ══ SECCIONES: PRÓXIMAMENTE ══ -->
+        <!-- ══ PRÓXIMAMENTE ══ -->
         <div id="section-promos" class="section-view" hidden>
-          <div class="coming-soon panel">
-            <div class="coming-icon">🏷</div>
-            <h2>Promociones</h2>
-            <p>Esta sección estará disponible próximamente.</p>
-          </div>
+          <div class="coming-soon panel"><div class="coming-icon">🏷</div><h2>Promociones</h2><p>Próximamente.</p></div>
         </div>
-
         <div id="section-reports" class="section-view" hidden>
-          <div class="coming-soon panel">
-            <div class="coming-icon">📊</div>
-            <h2>Reportes</h2>
-            <p>Esta sección estará disponible próximamente.</p>
-          </div>
+          <div class="coming-soon panel"><div class="coming-icon">📊</div><h2>Reportes</h2><p>Próximamente.</p></div>
         </div>
-
         <div id="section-config" class="section-view" hidden>
-          <div class="coming-soon panel">
-            <div class="coming-icon">⚙</div>
-            <h2>Configuración</h2>
-            <p>Esta sección estará disponible próximamente.</p>
-          </div>
+          <div class="coming-soon panel"><div class="coming-icon">⚙</div><h2>Configuración</h2><p>Próximamente.</p></div>
         </div>
 
-        <!-- TIP BAR -->
         <div class="tip-bar">
           <span class="tip-icon">🌿</span>
           <p class="tip-text"><strong>Consejo:</strong> Mantené tu catálogo actualizado para brindar la mejor experiencia a tus clientes.</p>
