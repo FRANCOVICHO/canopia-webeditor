@@ -43,7 +43,7 @@ function getCategoryNames() {
 }
 
 // ════════════════════════════════════════
-//  IMAGE HELPERS
+//  IMAGE HELPERS (URL-based)
 // ════════════════════════════════════════
 function parseImages(raw) {
   if (!raw) return [];
@@ -60,7 +60,6 @@ function serializeImages(arr) {
   return JSON.stringify(clean);
 }
 
-// In-memory list of image URLs for the current form
 let formImages = [];
 
 function renderImgPreviews() {
@@ -70,7 +69,8 @@ function renderImgPreviews() {
 
   wrap.innerHTML = formImages.map((url, i) => `
     <div class="img-thumb-wrap">
-      <img class="img-thumb" src="${escapeHtml(url)}" alt="" />
+      <img class="img-thumb" src="${escapeHtml(url)}" alt=""
+           onerror="this.style.opacity='0.3';this.title='URL inválida'" />
       <button type="button" class="img-thumb-remove" data-idx="${i}" title="Quitar">✕</button>
       ${i === 0 ? '<span class="img-thumb-main">Principal</span>' : ""}
     </div>
@@ -90,53 +90,33 @@ function syncImgHidden() {
   if (h) h.value = serializeImages(formImages);
 }
 
-function addImageUrls(urls) {
-  urls.forEach((u) => { if (u && !formImages.includes(u)) formImages.push(u); });
-  syncImgHidden();
-  renderImgPreviews();
-}
-
-// Convert File to base64 data URL (so it can be stored & displayed immediately)
-function fileToDataUrl(file) {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = (e) => resolve(e.target.result);
-    reader.readAsDataURL(file);
-  });
-}
-
-async function handleImageFiles(files) {
-  for (const file of files) {
-    if (!file.type.startsWith("image/")) continue;
-    const dataUrl = await fileToDataUrl(file);
-    if (!formImages.includes(dataUrl)) formImages.push(dataUrl);
+function addImageUrl(url) {
+  url = url.trim();
+  if (!url) return;
+  if (!formImages.includes(url)) {
+    formImages.push(url);
+    syncImgHidden();
+    renderImgPreviews();
   }
-  syncImgHidden();
-  renderImgPreviews();
 }
 
 function setupImageZone() {
-  const zone  = document.querySelector("#img-drop-zone");
-  const input = document.querySelector("#img-file-input");
-  if (!zone || !input) return;
+  const input  = document.querySelector("#img-url-input");
+  const addBtn = document.querySelector("#img-url-add");
+  if (!input || !addBtn) return;
 
-  zone.addEventListener("click", () => input.click());
-
-  zone.addEventListener("dragover", (e) => {
-    e.preventDefault();
-    zone.classList.add("drag-over");
-  });
-  zone.addEventListener("dragleave", () => zone.classList.remove("drag-over"));
-  zone.addEventListener("drop", (e) => {
-    e.preventDefault();
-    zone.classList.remove("drag-over");
-    handleImageFiles([...e.dataTransfer.files]);
-  });
-
-  input.addEventListener("change", () => {
-    handleImageFiles([...input.files]);
+  function doAdd() {
+    addImageUrl(input.value);
     input.value = "";
-  });
+    input.focus();
+  }
+
+  addBtn.addEventListener("click", doAdd);
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doAdd(); } });
+  // Auto-preview when user pastes a URL
+  input.addEventListener("paste", () => setTimeout(() => {
+    if (input.value.trim().startsWith("http")) doAdd();
+  }, 50));
 }
 
 // ════════════════════════════════════════

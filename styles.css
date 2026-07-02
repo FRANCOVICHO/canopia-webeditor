@@ -934,26 +934,26 @@ textarea {
 .cat-dropdown-item:hover { background: var(--lime-dim); color: var(--lime); }
 
 /* ═══════════════════════
-   IMAGE UPLOAD ZONE
+   IMAGE URL INPUT
 ═══════════════════════ */
-.img-drop-zone {
-  border: 2px dashed var(--border2);
-  border-radius: var(--radius-sm);
-  padding: 20px 12px;
+.img-url-row {
   display: flex;
-  flex-direction: column;
+  gap: 8px;
   align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
-  text-align: center;
 }
-.img-drop-zone p { font-size: 12px; color: var(--muted2); margin: 0; }
-.img-drop-zone:hover,
-.img-drop-zone.drag-over {
-  border-color: var(--lime);
-  background: var(--lime-dim);
+
+.img-url-row input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  transition: border-color 0.15s;
 }
+.img-url-row input:focus { outline: none; border-color: var(--lime); }
+.img-url-row input::placeholder { color: var(--muted); }
 
 .img-previews {
   display: flex;
