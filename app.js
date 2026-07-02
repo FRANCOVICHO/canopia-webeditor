@@ -314,11 +314,9 @@ function renderCatList() {
       </table>
     </div>`;
 
-  wrap.querySelectorAll("[data-cat-edit]").forEach((btn) => editCat(btn.dataset.catEdit));
   wrap.querySelectorAll("[data-cat-del]").forEach((btn) => {
     btn.addEventListener("click", () => deleteCat(btn.dataset.catDel));
   });
-  // re-attach edit listeners after innerHTML set
   wrap.querySelectorAll("[data-cat-edit]").forEach((btn) => {
     btn.addEventListener("click", () => editCat(btn.dataset.catEdit));
   });
@@ -327,11 +325,12 @@ function renderCatList() {
 function editCat(name) {
   const cats = getCategories();
   const stored = cats.find((c) => c.name === name);
-  document.querySelector("#cat-edit-original").value = name;
-  document.querySelector("#cat-name-input").value    = name;
-  document.querySelector("#cat-desc-input").value    = stored?.desc || "";
+  document.querySelector("#cat-edit-original").value    = name;
+  document.querySelector("#cat-name-input").value       = name;
+  document.querySelector("#cat-desc-input").value       = stored?.desc || "";
   document.querySelector("#cat-submit-btn").textContent = "Guardar cambios";
-  document.querySelector(".panel-head h2", document.querySelector("#cat-form").closest(".panel")).textContent = "Editar categoría";
+  document.querySelector("#cat-form").closest(".panel").querySelector(".panel-head h2").textContent = "Editar categoría";
+  document.querySelector("#cat-name-input").focus();
 }
 
 function deleteCat(name) {
@@ -604,10 +603,11 @@ function saveCategoryForm(event) {
 }
 
 function resetCatForm() {
-  document.querySelector("#cat-name-input").value    = "";
-  document.querySelector("#cat-desc-input").value    = "";
-  document.querySelector("#cat-edit-original").value = "";
+  document.querySelector("#cat-name-input").value       = "";
+  document.querySelector("#cat-desc-input").value       = "";
+  document.querySelector("#cat-edit-original").value    = "";
   document.querySelector("#cat-submit-btn").textContent = "Crear categoría";
+  document.querySelector("#cat-form").closest(".panel").querySelector(".panel-head h2").textContent = "Nueva categoría";
 }
 
 // ════════════════════════════════════════
