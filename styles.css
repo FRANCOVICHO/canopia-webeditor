@@ -1014,6 +1014,105 @@ textarea {
 }
 
 /* ═══════════════════════
+   ORDERS — nuevo flujo
+═══════════════════════ */
+.order-filters {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.filter-tab {
+  padding: 5px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border2);
+  background: transparent;
+  color: var(--muted2);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.filter-tab:hover { background: var(--surface2); color: var(--text); }
+.filter-tab.active { background: var(--lime); color: #111; border-color: var(--lime); }
+
+.order-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.order-card-head > div { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.order-card-head small { color: var(--muted); font-size: 11px; white-space: nowrap; }
+
+.order-status {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.status-pending   { background: rgba(240,165,0,0.15);  color: #f0a500; }
+.status-confirmed { background: var(--lime-dim);        color: var(--lime); }
+.status-rejected  { background: var(--red-dim);         color: var(--red); }
+
+.order-items { color: var(--muted2); font-size: 12px; margin-top: 4px; }
+.order-note  { color: var(--muted);  font-size: 12px; font-style: italic; margin-top: 3px; }
+
+.order-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.btn-confirm {
+  padding: 6px 14px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--lime);
+  color: #111;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-confirm:hover { background: var(--lime-dark); }
+
+.btn-reject {
+  padding: 6px 14px;
+  border: 1px solid var(--red);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--red);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-reject:hover { background: var(--red-dim); }
+
+/* badge en nav */
+.nav-badge {
+  margin-left: auto;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--lime);
+  color: #111;
+  font-size: 10px;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+/* ═══════════════════════
    TIP BAR
 ═══════════════════════ */
 .tip-bar {

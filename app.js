@@ -375,19 +375,100 @@ function renderCatProducts() {
 // ════════════════════════════════════════
 //  ORDERS / CLIENTS / INVENTORY
 // ════════════════════════════════════════
+
+// Active filter for the orders section
+let ordersFilter = "todos";
+
+async function loadOrders() {
+  const status = ordersFilter === "todos" ? "" : ordersFilter;
+  const url    = status ? `/api/admin/orders?status=${encodeURIComponent(status)}` : "/api/admin/orders";
+  const data   = await api(url);
+  orders = data.orders || [];
+  renderOrders();
+  renderClients();
+  updateOrdersBadge();
+}
+
+async function updateOrdersBadge() {
+  try {
+    const data    = await api("/api/admin/orders?status=pendiente");
+    const count   = (data.orders || []).length;
+    const badge   = document.querySelector("#orders-badge");
+    if (!badge) return;
+    badge.textContent = count > 0 ? count : "";
+    badge.hidden      = count === 0;
+  } catch { /* silently ignore */ }
+}
+
 function renderOrders() {
   const list = document.querySelector("#orders-list");
   if (!list) return;
-  if (!orders.length) { list.innerHTML = `<p class="muted-text" style="padding:12px 0">No hay pedidos todavía.</p>`; return; }
-  list.innerHTML = orders.map((order) => {
-    const items = JSON.parse(order.items_json || "[]");
-    return `<article class="order-card">
-      <strong>#${order.id} — ${escapeHtml(order.customer_name)}</strong>
-      <p>${escapeHtml(order.customer_phone)} · ${new Date(order.created_at).toLocaleString("es-AR")} · ${money.format(order.total)}</p>
-      <p>${items.map((i) => `${escapeHtml(i.name)} x${i.quantity}`).join(", ")}</p>
-      ${order.customer_note ? `<p>Nota: ${escapeHtml(order.customer_note)}</p>` : ""}
-    </article>`;
-  }).join("");
+
+  // Render filter tabs
+  const filtersHtml = ["todos","pendiente","confirmado","rechazado"].map((f) => `
+    <button type="button" class="filter-tab ${ordersFilter === f ? "active" : ""}" data-filter="${f}">
+      ${f.charAt(0).toUpperCase() + f.slice(1)}
+    </button>
+  `).join("");
+
+  if (!orders.length) {
+    list.innerHTML = `
+      <div class="order-filters">${filtersHtml}</div>
+      <p class="muted-text" style="padding:12px 0">No hay pedidos${ordersFilter !== "todos" ? ` con estado "${ordersFilter}"` : ""} todavía.</p>`;
+  } else {
+    list.innerHTML = `
+      <div class="order-filters">${filtersHtml}</div>
+      ${orders.map((order) => {
+        const items  = JSON.parse(order.items_json || "[]");
+        const status = order.status || "pendiente";
+        const statusClass = { pendiente: "status-pending", confirmado: "status-confirmed", rechazado: "status-rejected" }[status] || "";
+        const isPending = status === "pendiente";
+        return `
+          <article class="order-card order-card--${status}">
+            <div class="order-card-head">
+              <div>
+                <strong>#${order.id} — ${escapeHtml(order.customer_name)}</strong>
+                <span class="order-status ${statusClass}">${status}</span>
+              </div>
+              <small>${new Date(order.created_at).toLocaleString("es-AR")}</small>
+            </div>
+            <p>${escapeHtml(order.customer_phone)} · ${money.format(order.total)}</p>
+            <p class="order-items">${items.map((i) => `${escapeHtml(i.name)} ×${i.quantity}`).join(" · ")}</p>
+            ${order.customer_note ? `<p class="order-note">📝 ${escapeHtml(order.customer_note)}</p>` : ""}
+            ${isPending ? `
+              <div class="order-actions">
+                <button type="button" class="btn-confirm" data-confirm="${order.id}">✓ Confirmar</button>
+                <button type="button" class="btn-reject"  data-reject="${order.id}">✕ Rechazar</button>
+              </div>` : ""}
+          </article>`;
+      }).join("")}`;
+  }
+
+  // Bind filter tabs
+  list.querySelectorAll("[data-filter]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      ordersFilter = btn.dataset.filter;
+      loadOrders();
+    });
+  });
+
+  // Bind confirm / reject
+  list.querySelectorAll("[data-confirm]").forEach((btn) => {
+    btn.addEventListener("click", () => actionOrder(Number(btn.dataset.confirm), "confirm"));
+  });
+  list.querySelectorAll("[data-reject]").forEach((btn) => {
+    btn.addEventListener("click", () => actionOrder(Number(btn.dataset.reject), "reject"));
+  });
+}
+
+async function actionOrder(id, action) {
+  const label = action === "confirm" ? "confirmar" : "rechazar";
+  if (!confirm(`¿${label.charAt(0).toUpperCase() + label.slice(1)} el pedido #${id}?`)) return;
+  try {
+    await api(`/api/admin/orders?action=${action}`, { method: "POST", body: JSON.stringify({ id }) });
+    await loadOrders();
+    if (action === "confirm") await loadProducts(); // refresh stock
+  } catch (err) { alert(err.message); }
 }
 
 function renderClients() {
@@ -665,3 +746,8 @@ document.querySelectorAll(".nav-item").forEach((item) => {
     catch { localStorage.removeItem(sessionKey); }
   }
 })();
+
+// ─── Polling: badge de pedidos pendientes cada 15s ───
+setInterval(() => {
+  if (localStorage.getItem(sessionKey)) updateOrdersBadge();
+}, 15000);
