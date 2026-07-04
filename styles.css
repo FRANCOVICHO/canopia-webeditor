@@ -1113,6 +1113,71 @@ textarea {
 }
 
 /* ═══════════════════════
+   RECOVERY CODES
+═══════════════════════ */
+.recovery-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.recovery-card--expired {
+  opacity: 0.55;
+  border-color: var(--red-dim);
+}
+
+.recovery-top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.recovery-code {
+  font-size: 2rem;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  color: var(--lime);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.recovery-timer {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted2);
+}
+.recovery-timer--expired { color: var(--red); }
+
+.recovery-user {
+  font-size: 13px;
+  color: var(--muted2);
+  margin: 0;
+}
+.recovery-user strong { color: var(--text); }
+
+.btn-whatsapp {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  background: #25d366;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background 0.15s;
+  width: fit-content;
+}
+.btn-whatsapp:hover { background: #1da851; }
+
+/* ═══════════════════════
    TIP BAR
 ═══════════════════════ */
 .tip-bar {
