@@ -1,11 +1,18 @@
 import { assertAdmin } from "./_auth.js";
 
+// max_tokens por tipo de request
+const TOKEN_LIMITS = {
+  report: 800,
+  notif:  150,
+};
+
 export async function onRequestPost({ request, env }) {
   const denied = assertAdmin(request, env);
   if (denied) return denied;
 
   const body   = await request.json().catch(() => null);
   const prompt = body?.prompt;
+  const type   = body?.type || "report"; // "report" | "notif"
   if (!prompt) return Response.json({ error: "Falta el prompt." }, { status: 400 });
 
   const groqKey = env.GROQ_API_KEY;
@@ -18,10 +25,10 @@ export async function onRequestPost({ request, env }) {
       "Authorization": `Bearer ${groqKey}`,
     },
     body: JSON.stringify({
-      model: "llama3-8b-8192",
+      model: "llama-3.1-8b-instant",   // modelo más rápido de Groq
       messages: [{ role: "user", content: prompt }],
-      temperature: 0.7,
-      max_tokens: 1500,
+      temperature: 0.5,
+      max_tokens: TOKEN_LIMITS[type] ?? 800,
     }),
   });
 

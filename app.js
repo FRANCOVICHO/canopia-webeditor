@@ -1057,33 +1057,27 @@ async function generateGroqReport() {
   const totalRevenue = confirmed.reduce((s,o)=>s+Number(o.total||0),0);
   const totalVisits  = analytics.filter(a=>a.event==="pageview").reduce((s,a)=>s+Number(a.count||0),0);
 
-  const prompt = `Sos el analista de negocio de Canopia, una tienda de productos para cultivo. Analizá estos datos reales de los últimos 30 días y generá un informe ejecutivo detallado en español.
-
-DATOS:
-- Pedidos confirmados: ${confirmed.length} | Total facturado: $${totalRevenue.toLocaleString("es-AR")}
+  const prompt = `Sos el analista de Canopia, una tienda grow. Datos reales últimos 30 días:
+- Pedidos confirmados: ${confirmed.length} | Facturado: $${totalRevenue.toLocaleString("es-AR")}
 - Pedidos pendientes: ${pending.length}
-- Visitas totales a la tienda: ${totalVisits}
-- Productos sin stock: ${prods.filter(p=>Number(p.stock)===0).length}
-- Productos con stock bajo (≤5): ${lowStock.map(p=>p.name+"("+p.stock+")").join(", ")||"ninguno"}
-- Top 5 productos más vendidos: ${topSold.map(([n,q])=>n+" x"+q).join(", ")||"sin datos"}
-- Top 5 productos más vistos: ${topViewed.map(([n,v])=>n+" ("+v+" vistas)").join(", ")||"sin datos"}
-- Total productos en catálogo: ${prods.length}
-- Categorías: ${[...new Set(prods.map(p=>p.category).filter(Boolean))].join(", ")}
+- Visitas: ${totalVisits} | Productos sin stock: ${prods.filter(p=>Number(p.stock)===0).length}
+- Stock bajo (≤5): ${lowStock.map(p=>p.name+"("+p.stock+")").join(", ")||"ninguno"}
+- Top ventas: ${topSold.map(([n,q])=>n+" x"+q).join(", ")||"sin datos"}
+- Top vistos: ${topViewed.map(([n,v])=>n+" ("+v+")").join(", ")||"sin datos"}
 
-FORMATO DEL INFORME:
-1. Resumen ejecutivo (3-4 oraciones)
-2. Análisis de ventas (tendencias, productos estrella, oportunidades)
-3. Análisis de tráfico (comportamiento de visitas, conversión estimada)
-4. Stock y catálogo (alertas, recomendaciones)
-5. Recomendaciones accionables (mínimo 3 puntos concretos)
-
-Sé específico, usá los números reales, y dá recomendaciones prácticas para el negocio.`;
+Generá un informe breve y concreto con estas secciones (sin markdown, en texto plano):
+1. Resumen ejecutivo (2 oraciones)
+2. Ventas (tendencias clave)
+3. Tráfico (comportamiento)
+4. Stock (alertas urgentes)
+5. Recomendaciones (3 puntos accionables)
+Sé directo, usá los números reales.`;
 
   try {
     const res = await fetch(GROQ_API, {
       method: "POST",
       headers: { ...authHeaders() },
-      body: JSON.stringify({ prompt }),
+      body: JSON.stringify({ prompt, type: "report" }),
     });
 
     const data = await res.json();
@@ -1194,6 +1188,7 @@ async function loadNotifications() {
             prompt: `Sos el asistente de Canopia, una tienda grow. Basado en estos datos: ${summary}. 
               Generá EXACTAMENTE 2-3 alertas o consejos urgentes y concretos en español, en formato de lista corta. 
               Solo el texto, sin títulos, sin markdown, sin emojis. Máximo 3 líneas.`,
+            type: "notif",
           }),
         });
         const groqData = await groqRes.json();
