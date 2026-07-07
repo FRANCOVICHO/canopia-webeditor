@@ -83,8 +83,9 @@
             Reportes
           </a>
           <a href="javascript:void(0)" class="nav-item" data-section="config">
-            <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-            Configuración
+            <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            Notificaciones
+            <span class="nav-badge" id="notif-badge" hidden></span>
           </a>
         </nav>
         <div class="sidebar-user">
@@ -358,15 +359,60 @@
           </div>
         </div>
 
-        <!-- ══ PRÓXIMAMENTE ══ -->
-        <div id="section-promos" class="section-view" hidden>
-          <div class="coming-soon panel"><div class="coming-icon">🏷</div><h2>Promociones</h2><p>Próximamente.</p></div>
-        </div>
+        <!-- ══ REPORTES ══ -->
         <div id="section-reports" class="section-view" hidden>
-          <div class="coming-soon panel"><div class="coming-icon">📊</div><h2>Reportes</h2><p>Próximamente.</p></div>
+
+          <!-- Controles -->
+          <div class="report-toolbar panel">
+            <div class="report-toolbar-left">
+              <h2>📊 Reportes e inteligencia</h2>
+              <span class="muted-text">Datos de los últimos 30 días</span>
+            </div>
+            <div class="report-toolbar-right">
+              <button type="button" class="btn-ghost btn-sm" id="report-refresh">↺ Actualizar datos</button>
+              <button type="button" class="btn-primary" id="report-groq-btn">✦ Generar análisis con IA</button>
+            </div>
+          </div>
+
+          <!-- Gráficos -->
+          <div class="charts-grid">
+            <div class="panel chart-panel">
+              <div class="panel-head"><h2>Ventas por día</h2><span class="muted-text" id="chart-sales-total"></span></div>
+              <canvas id="chart-sales" height="180"></canvas>
+            </div>
+            <div class="panel chart-panel">
+              <div class="panel-head"><h2>Tráfico por hora</h2><span class="muted-text" id="chart-hours-total"></span></div>
+              <canvas id="chart-hours" height="180"></canvas>
+            </div>
+            <div class="panel chart-panel">
+              <div class="panel-head"><h2>Productos más vistos</h2><span class="muted-text" id="chart-products-total"></span></div>
+              <canvas id="chart-products" height="180"></canvas>
+            </div>
+          </div>
+
+          <!-- Análisis IA -->
+          <div class="panel" id="groq-panel" hidden>
+            <div class="panel-head">
+              <h2>✦ Análisis generado por IA</h2>
+              <span class="muted-text" id="groq-timestamp"></span>
+            </div>
+            <div id="groq-output" class="groq-output"></div>
+          </div>
+
         </div>
+
+        <!-- ══ NOTIFICACIONES ══ -->
         <div id="section-config" class="section-view" hidden>
-          <div class="coming-soon panel"><div class="coming-icon">⚙</div><h2>Configuración</h2><p>Próximamente.</p></div>
+          <div class="panel">
+            <div class="panel-head">
+              <h2>🔔 Notificaciones</h2>
+              <div style="display:flex;gap:8px;align-items:center">
+                <span class="nav-badge" id="notif-count" hidden></span>
+                <button type="button" class="btn-ghost btn-sm" id="notif-refresh">↺ Actualizar</button>
+              </div>
+            </div>
+            <div id="notif-list"></div>
+          </div>
         </div>
 
         <div class="tip-bar">

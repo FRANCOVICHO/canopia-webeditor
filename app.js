@@ -11,16 +11,16 @@ let filteredProducts = [];
 let activeSection = "products";
 
 const sectionMeta = {
-  dashboard:  { title: "Dashboard",                sub: "Resumen general del catálogo.",                 crumb: "Dashboard",     actions: false },
-  products:   { title: "Editar catálogo",          sub: "Gestioná tus productos, precios, stock y más.", crumb: "Productos",     actions: true  },
-  categories: { title: "Categorías",               sub: "Creá y administrá las categorías.",             crumb: "Categorías",    actions: false },
-  orders:     { title: "Pedidos",                  sub: "Últimos pedidos confirmados desde la web.",     crumb: "Pedidos",       actions: false },
-  recovery:   { title: "Códigos de recuperación",  sub: "Códigos de acceso pendientes de envío.",        crumb: "Recuperación",  actions: false },
-  clients:    { title: "Clientes",                 sub: "Clientes que realizaron pedidos.",              crumb: "Clientes",      actions: false },
-  inventory:  { title: "Inventario",               sub: "Stock actual de todos los productos.",          crumb: "Inventario",    actions: false },
-  promos:     { title: "Promociones",              sub: "Gestión de promociones y descuentos.",          crumb: "Promociones",   actions: false },
-  reports:    { title: "Reportes",                 sub: "Análisis y métricas del negocio.",              crumb: "Reportes",      actions: false },
-  config:     { title: "Configuración",            sub: "Ajustes generales del panel.",                  crumb: "Configuración", actions: false },
+  dashboard:  { title: "Dashboard",                sub: "Resumen general del catálogo.",                 crumb: "Dashboard",      actions: false },
+  products:   { title: "Editar catálogo",          sub: "Gestioná tus productos, precios, stock y más.", crumb: "Productos",      actions: true  },
+  categories: { title: "Categorías",               sub: "Creá y administrá las categorías.",             crumb: "Categorías",     actions: false },
+  orders:     { title: "Pedidos",                  sub: "Últimos pedidos confirmados desde la web.",     crumb: "Pedidos",        actions: false },
+  recovery:   { title: "Códigos de recuperación",  sub: "Códigos de acceso pendientes de envío.",        crumb: "Recuperación",   actions: false },
+  clients:    { title: "Clientes",                 sub: "Clientes que realizaron pedidos.",              crumb: "Clientes",       actions: false },
+  inventory:  { title: "Inventario",               sub: "Stock actual de todos los productos.",          crumb: "Inventario",     actions: false },
+  promos:     { title: "Promociones",              sub: "Gestión de promociones y descuentos.",          crumb: "Promociones",    actions: false },
+  reports:    { title: "Reportes",                 sub: "Análisis de ventas, tráfico e inteligencia.",   crumb: "Reportes",       actions: false },
+  config:     { title: "Notificaciones",           sub: "Alertas y avisos importantes del sistema.",     crumb: "Notificaciones", actions: false },
 };
 
 // ════════════════════════════════════════
@@ -235,6 +235,7 @@ function showAdmin() {
   setupCatPicker();
   loadAll();
   refreshRecoveryBadge();
+  setTimeout(loadNotifications, 1500); // cargar notifs después de que carguen los productos
 }
 
 async function loadAll() {
@@ -805,6 +806,430 @@ async function refreshRecoveryBadge() {
 }
 
 // ════════════════════════════════════════
+//  REPORTES + GRÁFICOS + GROQ
+// ════════════════════════════════════════
+const GROQ_API  = "https://api.groq.com/openai/v1/chat/completions";
+const GROQ_KEY  = "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"; // reemplazar por la key real
+const ANALYTICS = "https://canopiagrow.pages.dev/api/analytics";
+
+let reportData = null; // cache
+
+async function loadReports() {
+  document.querySelector("#report-groq-btn").disabled = true;
+  document.querySelector("#report-groq-btn").textContent = "Cargando datos…";
+
+  try {
+    // Fetch analytics + orders en paralelo
+    const [analyticsRes, ordersRes] = await Promise.all([
+      fetch(ANALYTICS, { headers: { "x-admin-password": localStorage.getItem(sessionKey) || "" } }),
+      api("/api/admin/orders"),
+    ]);
+
+    const analyticsData = await analyticsRes.json().catch(() => ({ analytics: [] }));
+    const analytics = analyticsData.analytics || [];
+
+    reportData = { analytics, orders: ordersRes.orders || [], products };
+
+    drawSalesChart(reportData.orders);
+    drawHoursChart(analytics);
+    drawProductsChart(analytics);
+
+  } catch (err) {
+    console.error("Error cargando reportes:", err);
+  } finally {
+    document.querySelector("#report-groq-btn").disabled = false;
+    document.querySelector("#report-groq-btn").textContent = "✦ Generar análisis con IA";
+  }
+}
+
+// ─── Gráfico: ventas por día ───
+function drawSalesChart(orders) {
+  const canvas = document.querySelector("#chart-sales");
+  if (!canvas) return;
+
+  // Agrupar por día (últimos 30 días)
+  const map = {};
+  const now = new Date();
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(now); d.setDate(d.getDate() - i);
+    map[d.toISOString().slice(0,10)] = 0;
+  }
+  orders.filter(o => o.status === "confirmado").forEach(o => {
+    const day = (o.created_at || "").slice(0,10);
+    if (day in map) map[day] += Number(o.total) || 0;
+  });
+
+  const labels = Object.keys(map).map(d => d.slice(5)); // MM-DD
+  const values = Object.values(map);
+  const total  = values.reduce((a,b) => a+b, 0);
+
+  const el = document.querySelector("#chart-sales-total");
+  if (el) el.textContent = money.format(total) + " total";
+
+  drawBarChart(canvas, labels, values, "#b8f000");
+}
+
+// ─── Gráfico: tráfico por hora ───
+function drawHoursChart(analytics) {
+  const canvas = document.querySelector("#chart-hours");
+  if (!canvas) return;
+
+  const map = {};
+  for (let h = 0; h < 24; h++) map[String(h).padStart(2,"0")] = 0;
+
+  analytics.filter(a => a.event === "pageview").forEach(a => {
+    const h = String(a.hour || "00").padStart(2,"0");
+    if (h in map) map[h] += Number(a.count) || 0;
+  });
+
+  const labels = Object.keys(map).map(h => h + "h");
+  const values = Object.values(map);
+  const total  = values.reduce((a,b) => a+b, 0);
+
+  const el = document.querySelector("#chart-hours-total");
+  if (el) el.textContent = total + " visitas";
+
+  drawBarChart(canvas, labels, values, "#3498db");
+}
+
+// ─── Gráfico: productos más vistos ───
+function drawProductsChart(analytics) {
+  const canvas = document.querySelector("#chart-products");
+  if (!canvas) return;
+
+  const map = {};
+  analytics.filter(a => a.event === "product_view" && a.product_id).forEach(a => {
+    map[a.product_id] = (map[a.product_id] || 0) + (Number(a.count) || 0);
+  });
+
+  const sorted = Object.entries(map).sort((a,b) => b[1]-a[1]).slice(0,8);
+  if (!sorted.length) {
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle = "#888";
+    ctx.font = "13px Inter, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("Sin datos de vistas todavía", canvas.width/2, canvas.height/2);
+    return;
+  }
+
+  // Resolver nombres desde products array
+  const labels = sorted.map(([id]) => {
+    const p = products.find(p => p.id === id);
+    return p ? p.name.slice(0,14) : id.slice(0,14);
+  });
+  const values = sorted.map(([,v]) => v);
+  const total  = values.reduce((a,b) => a+b, 0);
+
+  const el = document.querySelector("#chart-products-total");
+  if (el) el.textContent = total + " vistas";
+
+  drawBarChart(canvas, labels, values, "#e67e22");
+}
+
+// ─── Motor de gráfico de barras (canvas puro) ───
+function drawBarChart(canvas, labels, values, color) {
+  const dpr = window.devicePixelRatio || 1;
+  const W   = canvas.offsetWidth  || 600;
+  const H   = canvas.height;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W + "px";
+  canvas.style.height = H + "px";
+
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+
+  const PAD    = { top: 16, right: 16, bottom: 36, left: 48 };
+  const chartW = W - PAD.left - PAD.right;
+  const chartH = H - PAD.top  - PAD.bottom;
+  const max    = Math.max(...values, 1);
+  const barW   = chartW / labels.length;
+
+  // Grid lines
+  ctx.strokeStyle = "rgba(255,255,255,0.06)";
+  ctx.lineWidth   = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = PAD.top + chartH - (chartH * i / 4);
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + chartW, y); ctx.stroke();
+    ctx.fillStyle   = "#666";
+    ctx.font        = "10px Inter, sans-serif";
+    ctx.textAlign   = "right";
+    const val = Math.round(max * i / 4);
+    ctx.fillText(val > 999 ? (val/1000).toFixed(1)+"k" : val, PAD.left - 6, y + 3);
+  }
+
+  // Bars
+  values.forEach((v, i) => {
+    const bH  = (v / max) * chartH;
+    const x   = PAD.left + i * barW + barW * 0.15;
+    const y   = PAD.top  + chartH - bH;
+    const bWr = barW * 0.7;
+
+    // Bar fill
+    const grad = ctx.createLinearGradient(0, y, 0, y + bH);
+    grad.addColorStop(0, color);
+    grad.addColorStop(1, color + "55");
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.roundRect(x, y, bWr, bH, [3, 3, 0, 0]);
+    ctx.fill();
+
+    // Label
+    ctx.fillStyle   = "#666";
+    ctx.font        = "9px Inter, sans-serif";
+    ctx.textAlign   = "center";
+    ctx.save();
+    ctx.translate(x + bWr / 2, PAD.top + chartH + 4);
+    if (labels.length > 12) { ctx.rotate(-Math.PI/4); ctx.textAlign = "right"; }
+    ctx.fillText(labels[i], 0, 10);
+    ctx.restore();
+  });
+}
+
+// ─── Groq: generar análisis ───
+async function generateGroqReport() {
+  if (!reportData) { await loadReports(); }
+
+  const btn = document.querySelector("#report-groq-btn");
+  const panel = document.querySelector("#groq-panel");
+  const output = document.querySelector("#groq-output");
+  const ts = document.querySelector("#groq-timestamp");
+
+  btn.disabled = true;
+  btn.textContent = "✦ Analizando…";
+  panel.hidden = false;
+  output.innerHTML = `<p class="muted-text">Groq está analizando tus datos…</p>`;
+
+  // Preparar resumen de datos para mandar a Groq
+  const { orders, products: prods, analytics } = reportData;
+  const confirmed = orders.filter(o => o.status === "confirmado");
+  const pending   = orders.filter(o => o.status === "pendiente");
+  const lowStock  = prods.filter(p => Number(p.stock) <= 5);
+
+  // Top productos vendidos
+  const soldMap = {};
+  confirmed.forEach(o => {
+    JSON.parse(o.items_json || "[]").forEach(item => {
+      soldMap[item.name] = (soldMap[item.name] || 0) + item.quantity;
+    });
+  });
+  const topSold = Object.entries(soldMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+  // Top productos vistos
+  const viewMap = {};
+  analytics.filter(a => a.event === "product_view").forEach(a => {
+    if (a.product_id) viewMap[a.product_id] = (viewMap[a.product_id]||0) + Number(a.count||0);
+  });
+  const topViewed = Object.entries(viewMap).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([id,v]) => {
+    const p = prods.find(p=>p.id===id);
+    return [(p?.name||id), v];
+  });
+
+  const totalRevenue = confirmed.reduce((s,o)=>s+Number(o.total||0),0);
+  const totalVisits  = analytics.filter(a=>a.event==="pageview").reduce((s,a)=>s+Number(a.count||0),0);
+
+  const prompt = `Sos el analista de negocio de Canopia, una tienda de productos para cultivo. Analizá estos datos reales de los últimos 30 días y generá un informe ejecutivo detallado en español.
+
+DATOS:
+- Pedidos confirmados: ${confirmed.length} | Total facturado: $${totalRevenue.toLocaleString("es-AR")}
+- Pedidos pendientes: ${pending.length}
+- Visitas totales a la tienda: ${totalVisits}
+- Productos sin stock: ${prods.filter(p=>Number(p.stock)===0).length}
+- Productos con stock bajo (≤5): ${lowStock.map(p=>p.name+"("+p.stock+")").join(", ")||"ninguno"}
+- Top 5 productos más vendidos: ${topSold.map(([n,q])=>n+" x"+q).join(", ")||"sin datos"}
+- Top 5 productos más vistos: ${topViewed.map(([n,v])=>n+" ("+v+" vistas)").join(", ")||"sin datos"}
+- Total productos en catálogo: ${prods.length}
+- Categorías: ${[...new Set(prods.map(p=>p.category).filter(Boolean))].join(", ")}
+
+FORMATO DEL INFORME:
+1. Resumen ejecutivo (3-4 oraciones)
+2. Análisis de ventas (tendencias, productos estrella, oportunidades)
+3. Análisis de tráfico (comportamiento de visitas, conversión estimada)
+4. Stock y catálogo (alertas, recomendaciones)
+5. Recomendaciones accionables (mínimo 3 puntos concretos)
+
+Sé específico, usá los números reales, y dá recomendaciones prácticas para el negocio.`;
+
+  try {
+    const res = await fetch(GROQ_API, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${GROQ_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "llama3-8b-8192",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.7,
+        max_tokens: 1500,
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message || "Error de Groq");
+
+    const text = data.choices?.[0]?.message?.content || "Sin respuesta.";
+    output.innerHTML = text
+      .split("\n")
+      .map(line => {
+        if (line.startsWith("# "))  return `<h3>${line.slice(2)}</h3>`;
+        if (line.startsWith("## ")) return `<h4>${line.slice(3)}</h4>`;
+        if (line.match(/^\d+\./))   return `<p class="groq-point">${line}</p>`;
+        if (line.startsWith("- "))  return `<p class="groq-bullet">• ${line.slice(2)}</p>`;
+        if (line.trim() === "")     return `<br>`;
+        return `<p>${line}</p>`;
+      }).join("");
+
+    if (ts) ts.textContent = "Generado " + new Date().toLocaleString("es-AR");
+
+  } catch (err) {
+    output.innerHTML = `<p style="color:var(--red)">Error: ${escapeHtml(err.message)}</p>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "✦ Generar análisis con IA";
+  }
+}
+
+// ════════════════════════════════════════
+//  NOTIFICACIONES
+// ════════════════════════════════════════
+async function loadNotifications() {
+  const list = document.querySelector("#notif-list");
+  if (!list) return;
+  list.innerHTML = `<p class="muted-text" style="padding:8px 0">Analizando…</p>`;
+
+  const notifs = [];
+
+  try {
+    // 1. Pedidos pendientes
+    const ordersData = await api("/api/admin/orders?status=pendiente");
+    const pending = ordersData.orders || [];
+    if (pending.length > 0) {
+      notifs.push({
+        type: "warning",
+        icon: "📋",
+        title: `${pending.length} pedido${pending.length>1?"s":""} pendiente${pending.length>1?"s":""}`,
+        body: pending.map(o=>`#${o.id} — ${o.customer_name} — ${money.format(o.total)}`).join("<br>"),
+        action: "orders",
+        actionLabel: "Ver pedidos",
+      });
+    }
+
+    // 2. Stock bajo
+    const lowStock = products.filter(p => Number(p.stock) > 0 && Number(p.stock) <= 5);
+    const noStock  = products.filter(p => Number(p.stock) === 0);
+    if (noStock.length > 0) {
+      notifs.push({
+        type: "danger",
+        icon: "🚫",
+        title: `${noStock.length} producto${noStock.length>1?"s":""} sin stock`,
+        body: noStock.map(p=>escapeHtml(p.name)).join(", "),
+        action: "inventory",
+        actionLabel: "Ver inventario",
+      });
+    }
+    if (lowStock.length > 0) {
+      notifs.push({
+        type: "warning",
+        icon: "⚠️",
+        title: `${lowStock.length} producto${lowStock.length>1?"s":""} con stock bajo (≤5 unidades)`,
+        body: lowStock.map(p=>`${escapeHtml(p.name)}: ${p.stock} ud`).join(", "),
+        action: "inventory",
+        actionLabel: "Ver inventario",
+      });
+    }
+
+    // 3. Códigos de recuperación activos
+    try {
+      const recRes  = await fetch(RECOVERY_API, { headers: { "x-admin-password": localStorage.getItem(sessionKey)||"" } });
+      const recData = await recRes.json().catch(()=>({}));
+      const codes   = (recData.codes||[]);
+      if (codes.length > 0) {
+        notifs.push({
+          type: "info",
+          icon: "🔑",
+          title: `${codes.length} código${codes.length>1?"s":""} de recuperación activo${codes.length>1?"s":""}`,
+          body: codes.map(c=>`${escapeHtml(c.name||"")} — ${Math.max(0,Math.round((new Date(c.expires)-Date.now())/60000))} min restantes`).join("<br>"),
+          action: "recovery",
+          actionLabel: "Ver códigos",
+        });
+      }
+    } catch {}
+
+    // 4. Groq analiza las notificaciones y agrega insights
+    if (notifs.length > 0 || products.length > 0) {
+      const summary = [
+        pending.length   ? `${pending.length} pedidos pendientes` : null,
+        noStock.length   ? `${noStock.length} productos sin stock` : null,
+        lowStock.length  ? `${lowStock.length} con stock bajo` : null,
+        `${products.length} productos en catálogo`,
+      ].filter(Boolean).join(", ");
+
+      try {
+        const groqRes = await fetch(GROQ_API, {
+          method: "POST",
+          headers: { "Content-Type":"application/json", "Authorization":`Bearer ${GROQ_KEY}` },
+          body: JSON.stringify({
+            model: "llama3-8b-8192",
+            messages: [{ role:"user", content:
+              `Sos el asistente de Canopia, una tienda grow. Basado en estos datos: ${summary}. 
+              Generá EXACTAMENTE 2-3 alertas o consejos urgentes y concretos en español, en formato de lista corta. 
+              Solo el texto, sin títulos, sin markdown, sin emojis. Máximo 3 líneas.` }],
+            temperature: 0.5,
+            max_tokens: 200,
+          }),
+        });
+        const groqData = await groqRes.json();
+        const insight  = groqData.choices?.[0]?.message?.content;
+        if (insight) {
+          notifs.push({
+            type: "ai",
+            icon: "✦",
+            title: "Análisis de IA",
+            body: escapeHtml(insight).replace(/\n/g,"<br>"),
+          });
+        }
+      } catch {}
+    }
+
+  } catch (err) {
+    notifs.push({ type:"danger", icon:"⚠️", title:"Error al cargar datos", body: escapeHtml(err.message) });
+  }
+
+  // Actualizar badge
+  const badge = document.querySelector("#notif-badge");
+  const count = document.querySelector("#notif-count");
+  const critical = notifs.filter(n => n.type === "danger" || n.type === "warning").length;
+  [badge, count].forEach(el => {
+    if (!el) return;
+    el.textContent = critical > 0 ? critical : "";
+    el.hidden = critical === 0;
+  });
+
+  if (!notifs.length) {
+    list.innerHTML = `<div class="notif-empty">✅ Todo en orden, no hay alertas.</div>`;
+    return;
+  }
+
+  list.innerHTML = notifs.map(n => `
+    <div class="notif-card notif-card--${n.type}">
+      <div class="notif-head">
+        <span class="notif-icon">${n.icon}</span>
+        <strong class="notif-title">${n.title}</strong>
+      </div>
+      <p class="notif-body">${n.body}</p>
+      ${n.action ? `<button type="button" class="btn-ghost btn-sm" data-nav="${n.action}">${n.actionLabel}</button>` : ""}
+    </div>
+  `).join("");
+
+  list.querySelectorAll("[data-nav]").forEach(btn => {
+    btn.addEventListener("click", () => navigateTo(btn.dataset.nav));
+  });
+}
+
+// ════════════════════════════════════════
 //  HELPERS
 // ════════════════════════════════════════
 function escapeHtml(str) {
@@ -848,11 +1273,16 @@ document.querySelector("#logout").addEventListener("click", () => {
 document.querySelector("#search-input")?.addEventListener("input", () => applyFilter(1));
 
 document.querySelector("#recovery-refresh")?.addEventListener("click", loadRecoveryCodes);
+document.querySelector("#report-refresh")?.addEventListener("click", loadReports);
+document.querySelector("#report-groq-btn")?.addEventListener("click", generateGroqReport);
+document.querySelector("#notif-refresh")?.addEventListener("click", loadNotifications);
 
 document.querySelectorAll(".nav-item").forEach((item) => {
   item.addEventListener("click", () => {
     navigateTo(item.dataset.section);
-    if (item.dataset.section === "recovery") loadRecoveryCodes();
+    if (item.dataset.section === "recovery")  loadRecoveryCodes();
+    if (item.dataset.section === "reports")   loadReports();
+    if (item.dataset.section === "config")    loadNotifications();
   });
 });
 
