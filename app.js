@@ -44,8 +44,10 @@ function getCategoryNames() {
 }
 
 // ════════════════════════════════════════
-//  IMAGE HELPERS (URL-based)
+//  IMAGE HELPERS (URL + PocketBase upload)
 // ════════════════════════════════════════
+const PB_URL = "https://jeans-statement-wave-transactions.trycloudflare.com";
+
 function parseImages(raw) {
   if (!raw) return [];
   if (raw.trim().startsWith("[")) {
@@ -101,23 +103,76 @@ function addImageUrl(url) {
   }
 }
 
-function setupImageZone() {
-  const input  = document.querySelector("#img-url-input");
-  const addBtn = document.querySelector("#img-url-add");
-  if (!input || !addBtn) return;
+async function uploadFileToPocketBase(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await fetch(`${PB_URL}/api/collections/product_images/records`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || "Error al subir la imagen");
+  }
+  const data = await res.json();
+  // PocketBase URL format: /api/files/COLLECTION_ID/RECORD_ID/FILENAME
+  return `${PB_URL}/api/files/${data.collectionId}/${data.id}/${data.file}`;
+}
 
-  function doAdd() {
-    addImageUrl(input.value);
-    input.value = "";
-    input.focus();
+async function handleImageFiles(files) {
+  const zone = document.querySelector("#img-drop-zone");
+  const status = document.querySelector("#img-upload-status");
+
+  for (const file of files) {
+    if (!file.type.startsWith("image/")) continue;
+    if (status) status.textContent = `Subiendo ${file.name}…`;
+    if (zone) zone.classList.add("uploading");
+    try {
+      const url = await uploadFileToPocketBase(file);
+      addImageUrl(url);
+      if (status) status.textContent = "✓ Subida correctamente";
+      setTimeout(() => { if (status) status.textContent = ""; }, 2000);
+    } catch (err) {
+      if (status) status.textContent = `Error: ${err.message}`;
+    } finally {
+      if (zone) zone.classList.remove("uploading");
+    }
+  }
+}
+
+function setupImageZone() {
+  const zone    = document.querySelector("#img-drop-zone");
+  const fileIn  = document.querySelector("#img-file-input");
+  const urlIn   = document.querySelector("#img-url-input");
+  const addBtn  = document.querySelector("#img-url-add");
+
+  if (zone && fileIn) {
+    zone.addEventListener("click", () => fileIn.click());
+    zone.addEventListener("dragover", (e) => { e.preventDefault(); zone.classList.add("drag-over"); });
+    zone.addEventListener("dragleave", () => zone.classList.remove("drag-over"));
+    zone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      zone.classList.remove("drag-over");
+      handleImageFiles([...e.dataTransfer.files]);
+    });
+    fileIn.addEventListener("change", () => {
+      handleImageFiles([...fileIn.files]);
+      fileIn.value = "";
+    });
   }
 
-  addBtn.addEventListener("click", doAdd);
-  input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doAdd(); } });
-  // Auto-preview when user pastes a URL
-  input.addEventListener("paste", () => setTimeout(() => {
-    if (input.value.trim().startsWith("http")) doAdd();
-  }, 50));
+  if (urlIn && addBtn) {
+    function doAddUrl() {
+      addImageUrl(urlIn.value);
+      urlIn.value = "";
+      urlIn.focus();
+    }
+    addBtn.addEventListener("click", doAddUrl);
+    urlIn.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doAddUrl(); } });
+    urlIn.addEventListener("paste", () => setTimeout(() => {
+      if (urlIn.value.trim().startsWith("http")) doAddUrl();
+    }, 50));
+  }
 }
 
 // ════════════════════════════════════════
@@ -685,7 +740,7 @@ async function loadRecoveryCodes() {
 
   try {
     const res = await fetch(RECOVERY_API, {
-      headers: { "Authorization": "Bearer " + (localStorage.getItem(sessionKey) || "") },
+      headers: { "x-admin-password": localStorage.getItem(sessionKey) || "" },
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || "No se pudo cargar.");
@@ -742,7 +797,7 @@ function updateRecoveryBadge(count) {
 async function refreshRecoveryBadge() {
   try {
     const res  = await fetch(RECOVERY_API, {
-      headers: { "Authorization": "Bearer " + (localStorage.getItem(sessionKey) || "") },
+      headers: { "x-admin-password": localStorage.getItem(sessionKey) || "" },
     });
     const data = await res.json().catch(() => ({}));
     updateRecoveryBadge((data.codes || []).length);
