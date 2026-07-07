@@ -122,9 +122,21 @@ async function uploadFileToPocketBase(file) {
 async function handleImageFiles(files) {
   const zone = document.querySelector("#img-drop-zone");
   const status = document.querySelector("#img-upload-status");
+  const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
+  const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
   for (const file of files) {
-    if (!file.type.startsWith("image/")) continue;
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      if (status) status.textContent = `Error: Solo JPG, PNG o WEBP permitidos.`;
+      setTimeout(() => { if (status) status.textContent = ""; }, 3000);
+      continue;
+    }
+    if (file.size > MAX_SIZE) {
+      if (status) status.textContent = `Error: El archivo supera los 5MB.`;
+      setTimeout(() => { if (status) status.textContent = ""; }, 3000);
+      continue;
+    }
+
     if (status) status.textContent = `Subiendo ${file.name}…`;
     if (zone) zone.classList.add("uploading");
     try {
@@ -210,9 +222,18 @@ function setupCatPicker() {
 // ════════════════════════════════════════
 //  API
 // ════════════════════════════════════════
+function updateLastActive() {
+  localStorage.setItem("canopia_last_active", Date.now().toString());
+}
+
+document.addEventListener("click", updateLastActive);
+document.addEventListener("keypress", updateLastActive);
+document.addEventListener("scroll", updateLastActive, { passive: true });
+
 const authHeaders = () => ({
   "Content-Type": "application/json",
   "x-admin-password": localStorage.getItem(sessionKey) || "",
+  "X-Last-Active": localStorage.getItem("canopia_last_active") || Date.now().toString(),
 });
 
 async function api(path, options = {}) {
@@ -221,6 +242,13 @@ async function api(path, options = {}) {
     headers: { ...authHeaders(), ...(options.headers || {}) },
   });
   const data = await response.json().catch(() => ({}));
+  
+  if (response.status === 401 && data.error === "Sesión expirada por inactividad.") {
+    localStorage.removeItem(sessionKey);
+    alert("Tu sesión expiró por inactividad. Ingresá de nuevo.");
+    location.reload();
+  }
+  
   if (!response.ok) throw new Error(data.error || "No se pudo completar la accion.");
   return data;
 }
@@ -808,8 +836,7 @@ async function refreshRecoveryBadge() {
 // ════════════════════════════════════════
 //  REPORTES + GRÁFICOS + GROQ
 // ════════════════════════════════════════
-const GROQ_API  = "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_KEY  = "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"; // reemplazar por la key real
+const GROQ_API  = "/api/admin/groq"; // proxy seguro — la key vive en Cloudflare env
 const ANALYTICS = "https://canopiagrow.pages.dev/api/analytics";
 
 let reportData = null; // cache
@@ -1055,22 +1082,14 @@ Sé específico, usá los números reales, y dá recomendaciones prácticas para
   try {
     const res = await fetch(GROQ_API, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${GROQ_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "llama3-8b-8192",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.7,
-        max_tokens: 1500,
-      }),
+      headers: { ...authHeaders() },
+      body: JSON.stringify({ prompt }),
     });
 
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error?.message || "Error de Groq");
+    if (!res.ok) throw new Error(data.error || "Error de Groq");
 
-    const text = data.choices?.[0]?.message?.content || "Sin respuesta.";
+    const text = data.text || "Sin respuesta.";
     output.innerHTML = text
       .split("\n")
       .map(line => {
@@ -1170,19 +1189,15 @@ async function loadNotifications() {
       try {
         const groqRes = await fetch(GROQ_API, {
           method: "POST",
-          headers: { "Content-Type":"application/json", "Authorization":`Bearer ${GROQ_KEY}` },
+          headers: { ...authHeaders() },
           body: JSON.stringify({
-            model: "llama3-8b-8192",
-            messages: [{ role:"user", content:
-              `Sos el asistente de Canopia, una tienda grow. Basado en estos datos: ${summary}. 
+            prompt: `Sos el asistente de Canopia, una tienda grow. Basado en estos datos: ${summary}. 
               Generá EXACTAMENTE 2-3 alertas o consejos urgentes y concretos en español, en formato de lista corta. 
-              Solo el texto, sin títulos, sin markdown, sin emojis. Máximo 3 líneas.` }],
-            temperature: 0.5,
-            max_tokens: 200,
+              Solo el texto, sin títulos, sin markdown, sin emojis. Máximo 3 líneas.`,
           }),
         });
         const groqData = await groqRes.json();
-        const insight  = groqData.choices?.[0]?.message?.content;
+        const insight  = groqData.text;
         if (insight) {
           notifs.push({
             type: "ai",
