@@ -848,7 +848,7 @@ async function loadReports() {
   try {
     // Fetch analytics + orders en paralelo
     const [analyticsRes, ordersRes] = await Promise.all([
-      fetch(ANALYTICS, { headers: { "x-admin-password": localStorage.getItem(sessionKey) || "" } }),
+      fetch(ANALYTICS, { headers: { "x-admin-password": localStorage.getItem(sessionKey) || "" } }).catch(() => ({ json: () => ({ analytics: [] }) })),
       api("/api/admin/orders"),
     ]);
 
