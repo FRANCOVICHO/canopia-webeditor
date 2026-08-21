@@ -760,7 +760,7 @@ function resetCatForm() {
 // ════════════════════════════════════════
 //  RECOVERY CODES
 // ════════════════════════════════════════
-const RECOVERY_API = "https://canopiagrow.pages.dev/api/auth?action=recovery-codes";
+const RECOVERY_API = "https://canopiagrow.com/api/auth?action=recovery-codes";
 
 async function loadRecoveryCodes() {
   const container = document.querySelector("#recovery-list");
@@ -837,7 +837,7 @@ async function refreshRecoveryBadge() {
 //  REPORTES + GRÁFICOS + GROQ
 // ════════════════════════════════════════
 const GROQ_API  = "/api/admin/groq"; // proxy seguro — la key vive en Cloudflare env
-const ANALYTICS = "https://canopiagrow.pages.dev/api/analytics";
+const ANALYTICS = "https://canopiagrow.com/api/analytics";
 
 let reportData = null; // cache
 
