@@ -2,9 +2,9 @@
  * POST /api/admin/upload-images
  *
  * Recibe UN archivo por request como JSON:
- *   { name: string, type: string, size: number, data: number[] }
+ *   { name: string, type: string, size: number, data: string }
  *
- * El campo "data" es un Array.from(new Uint8Array(buffer)) serializado.
+ * El campo "data" es el contenido del archivo codificado en base64.
  * Este enfoque evita el parser multipart de Cloudflare Workers, que
  * convierte partes sin filename a string en lugar de File.
  *
@@ -71,7 +71,7 @@ export async function onRequestPost({ request, env }) {
     );
   }
 
-  const { name: originalName, type: declaredType, size: declaredSize, data: base64Data } = payload;
+  const { name: originalName, type: declaredType, data: base64Data } = payload;
 
   // Validar campos obligatorios
   if (!originalName || typeof base64Data !== "string" || base64Data.length === 0) {

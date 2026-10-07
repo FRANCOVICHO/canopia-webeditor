@@ -267,7 +267,6 @@ function validateImageFile(file) {
   return null; // ok
 }
 
-// ── Enviar un archivo al backend como JSON (evita el parser multipart de Workers) ──
 // ── Convertir ArrayBuffer a base64 sin bloquear el browser ───────────────
 // Procesa en chunks de 32KB para evitar que btoa + string concatenation
 // cause jank en el hilo principal con imágenes grandes.
