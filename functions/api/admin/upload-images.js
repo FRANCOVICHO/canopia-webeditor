@@ -95,6 +95,16 @@ export async function onRequestPost({ request, env }) {
     return Response.json({ error: "No se enviaron archivos. El campo debe llamarse 'files'." }, { status: 400 });
   }
 
+  // LOG DIAGNÓSTICO BACKEND — qué objetos devuelve formData.getAll()
+  console.log("[upload] formData.getAll diagnóstico:", files.map((f, idx) => ({
+    idx,
+    typeofF:     typeof f,
+    constructor: f?.constructor?.name,
+    name:        f?.name,
+    size:        f?.size,
+    type:        f?.type,
+  })));
+
   console.log(`[upload] Recibidas ${files.length} imagen${files.length !== 1 ? "es" : ""}`);
 
   const results  = []; // { url, filename, original, ok: true }

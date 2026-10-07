@@ -350,7 +350,18 @@ async function uploadFilesToGitHub(files) {
 
     try {
       const fd = new FormData();
-      fd.append("files", file);
+      // Log diagnóstico — confirmar que file es un File real antes de enviar
+      console.log("[UPLOAD DEBUG] uploadFilesToGitHub fd.append", {
+        constructor: file?.constructor?.name,
+        name: file?.name,
+        size: file?.size,
+        type: file?.type,
+        isFile: file instanceof File,
+      });
+      // Siempre pasar el filename explícito como tercer arg.
+      // Sin él, algunos browsers envían la parte sin "filename" en el
+      // Content-Disposition y Cloudflare Workers lo parsea como string.
+      fd.append("files", file, file.name || "imagen.jpg");
 
       const res  = await fetch(IMG_UPLOAD_ENDPOINT, {
         method: "POST",
@@ -417,7 +428,14 @@ async function retryFailedImage(idx) {
 
   try {
     const fd = new FormData();
-    fd.append("files", img._file);
+    console.log("[UPLOAD DEBUG] retryFailedImage fd.append", {
+      constructor: img._file?.constructor?.name,
+      name: img._file?.name,
+      size: img._file?.size,
+      type: img._file?.type,
+      isFile: img._file instanceof File,
+    });
+    fd.append("files", img._file, img._file?.name || "imagen.jpg");
 
     const res  = await fetch(IMG_UPLOAD_ENDPOINT, {
       method: "POST",
@@ -480,7 +498,14 @@ function triggerReplaceFile(idx) {
 
     try {
       const fd = new FormData();
-      fd.append("files", file);
+      console.log("[UPLOAD DEBUG] triggerReplaceFile fd.append", {
+        constructor: file?.constructor?.name,
+        name: file?.name,
+        size: file?.size,
+        type: file?.type,
+        isFile: file instanceof File,
+      });
+      fd.append("files", file, file.name || "imagen.jpg");
 
       const res  = await fetch(IMG_UPLOAD_ENDPOINT, {
         method: "POST",
