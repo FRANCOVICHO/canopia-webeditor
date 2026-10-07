@@ -233,20 +233,52 @@
                   </label>
                 </div>
 
-                <!-- IMÁGENES: drag & drop + URL manual -->
+                <!-- IMÁGENES: galería múltiple con subida automática a GitHub -->
                 <div class="field-group">
-                  <span class="field-label" style="margin-bottom:6px">Imágenes</span>
+                  <span class="field-label" style="margin-bottom:8px">
+                    Imágenes
+                    <span class="img-field-hint">La primera imagen es la portada del producto</span>
+                  </span>
+
+                  <!-- Banner de estado de configuración GitHub -->
+                  <div id="github-config-banner" class="github-config-banner" hidden>
+                    <span id="github-config-icon" class="github-config-icon"></span>
+                    <span id="github-config-msg" class="github-config-msg"></span>
+                    <button type="button" id="github-config-retry" class="github-config-retry btn-ghost btn-sm" hidden>↺ Reintentar</button>
+                  </div>
+
+                  <!-- Zona drop -->
                   <div class="img-drop-zone" id="img-drop-zone">
-                    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--muted)"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                    <p>Arrastrá una imagen o hacé click para subir</p>
-                    <input type="file" id="img-file-input" accept="image/*" multiple hidden />
+                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--muted)">
+                      <rect x="3" y="3" width="18" height="18" rx="2"/>
+                      <circle cx="8.5" cy="8.5" r="1.5"/>
+                      <polyline points="21 15 16 10 5 21"/>
+                    </svg>
+                    <p class="img-drop-title">Arrastrá una o varias imágenes aquí o hacé clic para seleccionarlas</p>
+                    <p class="img-drop-hint">JPG · PNG · WEBP · Máx. 10 MB por imagen</p>
+                    <input type="file" id="img-file-input" accept="image/jpeg,image/jpg,image/png,image/webp" multiple hidden />
                   </div>
-                  <p id="img-upload-status" class="message" style="min-height:16px;margin-top:4px"></p>
-                  <div class="img-url-row" style="margin-top:4px">
+
+                  <!-- Estado de subida -->
+                  <p id="img-upload-status" class="img-upload-status-text" style="min-height:18px;margin-top:6px"></p>
+
+                  <!-- Barra de progreso general -->
+                  <div id="img-upload-progress" class="img-progress-bar" style="display:none">
+                    <div class="img-progress-track">
+                      <div class="img-progress-fill"></div>
+                    </div>
+                    <span class="img-progress-label">0 / 0</span>
+                  </div>
+
+                  <!-- URL manual -->
+                  <div class="img-url-row" style="margin-top:8px">
                     <input type="url" id="img-url-input" placeholder="O pegá una URL de imagen…" autocomplete="off" />
-                    <button type="button" class="btn-ghost btn-sm" id="img-url-add">＋</button>
+                    <button type="button" class="btn-ghost btn-sm" id="img-url-add" title="Agregar URL">＋</button>
                   </div>
-                  <div class="img-previews" id="img-previews"></div>
+
+                  <!-- Galería de imágenes -->
+                  <div class="img-gallery" id="img-gallery"></div>
+
                   <input type="hidden" name="image" id="img-hidden" />
                 </div>
 
@@ -418,6 +450,19 @@
         <div class="tip-bar">
           <span class="tip-icon">🌿</span>
           <p class="tip-text"><strong>Consejo:</strong> Mantené tu catálogo actualizado para brindar la mejor experiencia a tus clientes.</p>
+        </div>
+
+        <!-- ══ MIGRACIÓN DE IMÁGENES LEGACY (oculto, se activa desde check-config) ══ -->
+        <div id="migration-panel" class="panel migration-panel" hidden>
+          <div class="panel-head">
+            <h2>🔄 Migración de imágenes legacy</h2>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span id="migration-count-badge" class="nav-badge" hidden></span>
+              <button type="button" class="btn-ghost btn-sm" id="migration-scan-btn">↺ Escanear productos</button>
+            </div>
+          </div>
+          <p id="migration-summary" class="muted-text" style="margin-bottom:1rem"></p>
+          <div id="migration-list"></div>
         </div>
 
       </main>

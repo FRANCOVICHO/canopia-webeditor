@@ -2,6 +2,25 @@ name = "canopia-webeditor"
 pages_build_output_dir = "."
 
 [[d1_databases]]
-binding = "canopia_db"
+binding  = "canopia_db"
 database_name = "canopia-db"
-database_id = "a47f1a66-798c-4620-8c0b-36633ad81675"
+database_id   = "a47f1a66-798c-4620-8c0b-36633ad81675"
+
+# ── Variables de entorno ─────────────────────────────────────────────────────
+# Los valores NO-secretos van aquí como [vars].
+# Los secretos (GITHUB_TOKEN, ADMIN_PASSWORD) NUNCA van aquí — se configuran
+# en Cloudflare Pages → Settings → Environment Variables como "Encrypted".
+#
+# Pasos para configurar los secretos:
+#   1. Ir a https://dash.cloudflare.com → Pages → canopia-webeditor
+#   2. Settings → Environment Variables → Add variable (Production + Preview)
+#   3. Agregar:
+#        GITHUB_TOKEN    = <tu Personal Access Token con scope Contents: Read & Write>
+#        ADMIN_PASSWORD  = <contraseña del panel de administración>
+#   4. Marcar ambas como "Encrypt" para que no sean visibles en logs.
+#
+# Variables NO-secretas (valores públicos — seguros de commitear):
+[vars]
+GITHUB_OWNER  = "FRANCOVICHO"
+GITHUB_REPO   = "photoscanopia"
+GITHUB_BRANCH = "main"

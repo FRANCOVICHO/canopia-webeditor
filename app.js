@@ -44,48 +44,42 @@ function getCategoryNames() {
 }
 
 // ════════════════════════════════════════
-//  IMAGE HELPERS (URL + PocketBase upload)
+//  IMAGE GALLERY UPLOADER
+//  Subida automática a GitHub vía backend.
+//  Drag & drop múltiple, reordenamiento,
+//  progreso individual, reintentos, galería.
 // ════════════════════════════════════════
-const PB_URL = "https://jeans-statement-wave-transactions.trycloudflare.com";
 
+// ── Configuración ────────────────────────
+const IMG_MAX_SIZE_MB  = 10;
+const IMG_MAX_SIZE     = IMG_MAX_SIZE_MB * 1024 * 1024;
+const IMG_ALLOWED_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
+const IMG_UPLOAD_ENDPOINT = "/api/admin/upload-images";
+
+// ── Estado del uploader ──────────────────
+// Cada entrada: { url: string, status: "ready"|"uploading"|"done"|"error", name: string, error?: string, localPreview?: string }
+let formImages = [];
+let imgUploading = false;    // true mientras hay subidas en curso
+let imgDragSrcIdx = null;    // índice origen del drag & drop de reordenamiento
+
+// ── Serialización ────────────────────────
 function parseImages(raw) {
   if (!raw) return [];
-  if (raw.trim().startsWith("[")) {
-    try { return JSON.parse(raw).filter(Boolean); } catch { return [raw]; }
+  const s = String(raw).trim();
+  if (s.startsWith("[")) {
+    try { return JSON.parse(s).filter(Boolean); } catch { return [s]; }
   }
-  return [raw];
+  return s ? [s] : [];
 }
 
 function serializeImages(arr) {
-  const clean = arr.filter(Boolean);
+  const clean = arr
+    .filter((img) => img.status === "done" || img.status === "ready")
+    .map((img) => img.url)
+    .filter(Boolean);
   if (clean.length === 0) return "";
   if (clean.length === 1) return clean[0];
   return JSON.stringify(clean);
-}
-
-let formImages = [];
-
-function renderImgPreviews() {
-  const wrap = document.querySelector("#img-previews");
-  if (!wrap) return;
-  if (!formImages.length) { wrap.innerHTML = ""; return; }
-
-  wrap.innerHTML = formImages.map((url, i) => `
-    <div class="img-thumb-wrap">
-      <img class="img-thumb" src="${escapeHtml(url)}" alt=""
-           onerror="this.style.opacity='0.3';this.title='URL inválida'" />
-      <button type="button" class="img-thumb-remove" data-idx="${i}" title="Quitar">✕</button>
-      ${i === 0 ? '<span class="img-thumb-main">Principal</span>' : ""}
-    </div>
-  `).join("");
-
-  wrap.querySelectorAll("[data-idx]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      formImages.splice(Number(btn.dataset.idx), 1);
-      syncImgHidden();
-      renderImgPreviews();
-    });
-  });
 }
 
 function syncImgHidden() {
@@ -93,83 +87,475 @@ function syncImgHidden() {
   if (h) h.value = serializeImages(formImages);
 }
 
+// ── Bloquear/desbloquear botón Guardar ───
+function setGalleryUploading(active) {
+  imgUploading = active;
+  const saveBtn = document.querySelector("#product-form [type=submit]");
+  if (saveBtn) {
+    saveBtn.disabled = active;
+    saveBtn.title = active ? "Esperá a que terminen las subidas…" : "";
+  }
+}
+
+// ── Renderizar galería ───────────────────
+function renderImgPreviews() {
+  const wrap = document.querySelector("#img-gallery");
+  if (!wrap) return;
+
+  if (!formImages.length) {
+    wrap.innerHTML = `<p class="img-gallery-empty">No hay imágenes. Arrastrá o seleccioná archivos arriba.</p>`;
+    syncImgHidden();
+    return;
+  }
+
+  wrap.innerHTML = formImages.map((img, i) => {
+    const isMain     = i === 0;
+    const isDone     = img.status === "done" || img.status === "ready";
+    const isUploading = img.status === "uploading";
+    const isError    = img.status === "error";
+    const thumb      = img.localPreview || (isDone ? img.url : "");
+
+    return `
+      <div class="img-gallery-item ${isUploading ? "is-uploading" : ""} ${isError ? "is-error" : ""}"
+           draggable="${isDone ? 'true' : 'false'}"
+           data-idx="${i}"
+           title="${escapeHtml(img.name || img.url || "")}">
+
+        <div class="img-gallery-thumb">
+          ${thumb
+            ? `<img src="${escapeHtml(thumb)}" alt="" loading="lazy"
+                    onerror="this.closest('.img-gallery-thumb').innerHTML='<span class=img-err-icon>🖼</span>'" />`
+            : `<span class="img-err-icon">${isUploading ? "" : "🖼"}</span>`
+          }
+          ${isUploading ? `
+            <div class="img-gallery-overlay">
+              <div class="img-upload-spinner"></div>
+            </div>` : ""}
+          ${isError ? `
+            <div class="img-gallery-overlay img-gallery-overlay--error">
+              <span class="img-err-badge" title="${escapeHtml(img.error || 'Error')}">!</span>
+            </div>` : ""}
+        </div>
+
+        <div class="img-gallery-info">
+          ${isMain ? `<span class="img-gallery-main-badge">★ Principal</span>` : ""}
+          ${isUploading ? `<span class="img-gallery-status uploading">Subiendo…</span>` : ""}
+          ${isError ? `<span class="img-gallery-status error" title="${escapeHtml(img.error || '')}">${escapeHtml(img.error || 'Error').slice(0, 30)}</span>` : ""}
+        </div>
+
+        <div class="img-gallery-actions">
+          ${isDone && i > 0
+            ? `<button type="button" class="img-action-btn" data-make-main="${i}" title="Hacer principal">★</button>`
+            : ""}
+          ${isDone
+            ? `<button type="button" class="img-action-btn" data-replace="${i}" title="Reemplazar imagen">↺</button>`
+            : ""}
+          ${isError
+            ? `<button type="button" class="img-action-btn img-action-retry" data-retry="${i}" title="Reintentar">↻</button>`
+            : ""}
+          <button type="button" class="img-action-btn img-action-delete" data-remove="${i}" title="Eliminar">✕</button>
+        </div>
+
+        ${isDone && formImages.length > 1
+          ? `<div class="img-gallery-drag-hint" title="Arrastrá para reordenar">⠿</div>`
+          : ""}
+      </div>`;
+  }).join("");
+
+  // ── Listeners de acciones ────────────────
+  wrap.querySelectorAll("[data-remove]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const idx = Number(btn.dataset.remove);
+      const img = formImages[idx];
+      if (img?.localPreview) URL.revokeObjectURL(img.localPreview);
+      formImages.splice(idx, 1);
+      syncImgHidden();
+      renderImgPreviews();
+    });
+  });
+
+  wrap.querySelectorAll("[data-make-main]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const idx = Number(btn.dataset.makeMain);
+      const [moved] = formImages.splice(idx, 1);
+      formImages.unshift(moved);
+      syncImgHidden();
+      renderImgPreviews();
+    });
+  });
+
+  wrap.querySelectorAll("[data-replace]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const idx = Number(btn.dataset.replace);
+      triggerReplaceFile(idx);
+    });
+  });
+
+  wrap.querySelectorAll("[data-retry]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const idx = Number(btn.dataset.retry);
+      retryFailedImage(idx);
+    });
+  });
+
+  // ── Drag & drop para reordenar ──────────
+  wrap.querySelectorAll(".img-gallery-item[draggable=true]").forEach((item) => {
+    item.addEventListener("dragstart", (e) => {
+      imgDragSrcIdx = Number(item.dataset.idx);
+      item.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+    });
+    item.addEventListener("dragend", () => {
+      item.classList.remove("dragging");
+      wrap.querySelectorAll(".img-gallery-item").forEach((el) => el.classList.remove("drag-over-item"));
+    });
+    item.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      wrap.querySelectorAll(".img-gallery-item").forEach((el) => el.classList.remove("drag-over-item"));
+      item.classList.add("drag-over-item");
+    });
+    item.addEventListener("drop", (e) => {
+      e.preventDefault();
+      e.stopPropagation(); // evitar que archivos externos lleguen al zone handler
+      // Si hay archivos reales del sistema (no drag interno), subirlos en lugar de reordenar
+      const extFiles = [...(e.dataTransfer.files || [])].filter((f) => f.type.startsWith("image/"));
+      if (extFiles.length) {
+        imgDragSrcIdx = null;
+        uploadFilesToGitHub(extFiles);
+        return;
+      }
+      const destIdx = Number(item.dataset.idx);
+      if (imgDragSrcIdx === null || imgDragSrcIdx === destIdx) return;
+      const [moved] = formImages.splice(imgDragSrcIdx, 1);
+      formImages.splice(destIdx, 0, moved);
+      imgDragSrcIdx = null;
+      syncImgHidden();
+      renderImgPreviews();
+    });
+  });
+
+  syncImgHidden();
+}
+
+// ── Validar archivo antes de subir ───────
+function validateImageFile(file) {
+  if (!file || !(file instanceof File)) return "Archivo inválido.";
+  const mime = (file.type || "").toLowerCase();
+  if (!IMG_ALLOWED_TYPES.has(mime)) return `Formato no permitido: ${mime || "desconocido"}. Solo JPG, PNG o WEBP.`;
+  if (file.size > IMG_MAX_SIZE) return `El archivo supera ${IMG_MAX_SIZE_MB} MB.`;
+  return null; // ok
+}
+
+// ── Detectar duplicados por nombre+tamaño ─
+function isDuplicate(file) {
+  return formImages.some((img) => img._originalName === file.name && img._originalSize === file.size);
+}
+
+// ── Subir un lote de archivos al backend ──
+async function uploadFilesToGitHub(files) {
+  if (!files.length) return;
+
+  const statusEl  = document.querySelector("#img-upload-status");
+  const progressEl = document.querySelector("#img-upload-progress");
+  const zone      = document.querySelector("#img-drop-zone");
+
+  // Pre-validar todos los archivos antes de empezar
+  const validFiles   = [];
+  const invalidFiles = [];
+
+  for (const file of files) {
+    const err = validateImageFile(file);
+    if (err) {
+      invalidFiles.push({ name: file.name, error: err });
+      continue;
+    }
+    if (isDuplicate(file)) {
+      invalidFiles.push({ name: file.name, error: "Imagen duplicada." });
+      continue;
+    }
+    validFiles.push(file);
+  }
+
+  // Mostrar errores de validación
+  if (invalidFiles.length) {
+    const errMsg = invalidFiles.map((f) => `"${f.name}": ${f.error}`).join(" · ");
+    showImgStatus(`⚠ ${errMsg}`, "warning");
+  }
+
+  if (!validFiles.length) return;
+
+  // Crear entradas en estado "uploading" con preview local inmediato
+  const newEntries = validFiles.map((file) => {
+    const localPreview = URL.createObjectURL(file);
+    return {
+      url: "",
+      status: "uploading",
+      name: file.name,
+      error: null,
+      localPreview,
+      _originalName: file.name,
+      _originalSize: file.size,
+      _file: file,
+    };
+  });
+
+  formImages.push(...newEntries);
+  renderImgPreviews();
+  setGalleryUploading(true);
+  if (zone) zone.classList.add("uploading");
+
+  const total = validFiles.length;
+  let done = 0;
+
+  // Subir de a una para mostrar progreso individual (no saturar el backend)
+  for (let i = 0; i < validFiles.length; i++) {
+    const file      = validFiles[i];
+    const entryIdx  = formImages.findIndex(
+      (img) => img.status === "uploading" && img._originalName === file.name && img._originalSize === file.size
+    );
+    if (entryIdx === -1) continue;
+
+    // Actualizar status visual
+    done++;
+    if (statusEl) {
+      statusEl.textContent = `Subiendo imagen ${done} de ${total}… (${escapeHtml(file.name)})`;
+      statusEl.className   = "img-upload-status-text uploading";
+    }
+    if (progressEl) {
+      progressEl.style.display = "block";
+      progressEl.querySelector(".img-progress-fill").style.width = `${Math.round(((done - 1) / total) * 100)}%`;
+      progressEl.querySelector(".img-progress-label").textContent = `${done - 1} / ${total}`;
+    }
+
+    try {
+      const fd = new FormData();
+      fd.append("files", file);
+
+      const res  = await fetch(IMG_UPLOAD_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "x-admin-password": localStorage.getItem(sessionKey) || "",
+          "X-Last-Active": localStorage.getItem("canopia_last_active") || Date.now().toString(),
+        },
+        body: fd,
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) throw new Error(data.error || `Error HTTP ${res.status}`);
+
+      const urls = data.urls || [];
+      if (!urls.length) throw new Error(data.failures?.[0]?.error || "No se obtuvo URL.");
+
+      // Actualizar entrada a "done"
+      const img = formImages[entryIdx];
+      img.url    = urls[0];
+      img.status = "done";
+      // Mantener localPreview mientras la imagen de GitHub carga
+    } catch (err) {
+      const img = formImages[entryIdx];
+      img.status = "error";
+      img.error  = err.message;
+    }
+
+    renderImgPreviews();
+  }
+
+  // Barra final
+  if (progressEl) {
+    progressEl.querySelector(".img-progress-fill").style.width = "100%";
+    progressEl.querySelector(".img-progress-label").textContent = `${total} / ${total}`;
+    setTimeout(() => { progressEl.style.display = "none"; }, 1800);
+  }
+
+  const uploaded = formImages.filter((img) => img.status === "done").length;
+  const errors   = formImages.filter((img) => img.status === "error").length;
+
+  if (errors === 0) {
+    showImgStatus(`✓ ${total} imagen${total !== 1 ? "es" : ""} subida${total !== 1 ? "s" : ""} correctamente`, "success");
+  } else if (uploaded > 0) {
+    showImgStatus(`✓ ${uploaded} subida${uploaded !== 1 ? "s" : ""} · ⚠ ${errors} con error`, "warning");
+  } else {
+    showImgStatus(`✕ No se pudo subir ninguna imagen`, "error");
+  }
+
+  setGalleryUploading(false);
+  if (zone) zone.classList.remove("uploading");
+  syncImgHidden();
+}
+
+// ── Reintentar una imagen fallida ─────────
+async function retryFailedImage(idx) {
+  const img = formImages[idx];
+  if (!img || img.status !== "error" || !img._file) return;
+
+  img.status = "uploading";
+  img.error  = null;
+  renderImgPreviews();
+  setGalleryUploading(true);
+
+  try {
+    const fd = new FormData();
+    fd.append("files", img._file);
+
+    const res  = await fetch(IMG_UPLOAD_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "x-admin-password": localStorage.getItem(sessionKey) || "",
+        "X-Last-Active": localStorage.getItem("canopia_last_active") || Date.now().toString(),
+      },
+      body: fd,
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `Error HTTP ${res.status}`);
+
+    const urls = data.urls || [];
+    if (!urls.length) throw new Error(data.failures?.[0]?.error || "No se obtuvo URL.");
+
+    img.url    = urls[0];
+    img.status = "done";
+    img.error  = null;
+    showImgStatus("✓ Imagen resubida correctamente", "success");
+  } catch (err) {
+    img.status = "error";
+    img.error  = err.message;
+    showImgStatus(`✕ Error al reintentar: ${err.message}`, "error");
+  }
+
+  setGalleryUploading(false);
+  renderImgPreviews();
+  syncImgHidden();
+}
+
+// ── Reemplazar imagen individual ─────────
+function triggerReplaceFile(idx) {
+  const input = document.createElement("input");
+  input.type  = "file";
+  input.accept = "image/jpeg,image/jpg,image/png,image/webp";
+  input.addEventListener("change", async () => {
+    const file = input.files[0];
+    if (!file) return;
+
+    const err = validateImageFile(file);
+    if (err) { showImgStatus(`⚠ ${err}`, "warning"); return; }
+
+    // Reemplazar en lugar
+    const old = formImages[idx];
+    if (old?.localPreview) URL.revokeObjectURL(old.localPreview);
+
+    formImages[idx] = {
+      url: "",
+      status: "uploading",
+      name: file.name,
+      error: null,
+      localPreview: URL.createObjectURL(file),
+      _originalName: file.name,
+      _originalSize: file.size,
+      _file: file,
+    };
+    renderImgPreviews();
+    setGalleryUploading(true);
+
+    try {
+      const fd = new FormData();
+      fd.append("files", file);
+
+      const res  = await fetch(IMG_UPLOAD_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "x-admin-password": localStorage.getItem(sessionKey) || "",
+          "X-Last-Active": localStorage.getItem("canopia_last_active") || Date.now().toString(),
+        },
+        body: fd,
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Error HTTP ${res.status}`);
+
+      const urls = data.urls || [];
+      if (!urls.length) throw new Error(data.failures?.[0]?.error || "No se obtuvo URL.");
+
+      formImages[idx].url    = urls[0];
+      formImages[idx].status = "done";
+      showImgStatus("✓ Imagen reemplazada correctamente", "success");
+    } catch (err) {
+      formImages[idx].status = "error";
+      formImages[idx].error  = err.message;
+      showImgStatus(`✕ Error al reemplazar: ${err.message}`, "error");
+    }
+
+    setGalleryUploading(false);
+    renderImgPreviews();
+    syncImgHidden();
+  });
+  input.click();
+}
+
+// ── Mostrar mensaje de estado ─────────────
+let _statusTimer = null;
+function showImgStatus(msg, type = "info") {
+  const el = document.querySelector("#img-upload-status");
+  if (!el) return;
+  el.textContent = msg;
+  el.className   = `img-upload-status-text ${type}`;
+  clearTimeout(_statusTimer);
+  if (type === "success") {
+    _statusTimer = setTimeout(() => {
+      el.textContent = "";
+      el.className   = "img-upload-status-text";
+    }, 3500);
+  }
+}
+
+// ── Agregar URL externa manualmente ──────
 function addImageUrl(url) {
   url = url.trim();
   if (!url) return;
-  if (!formImages.includes(url)) {
-    formImages.push(url);
-    syncImgHidden();
-    renderImgPreviews();
-  }
+  if (!url.startsWith("http")) return;
+  if (formImages.some((img) => img.url === url)) return;
+  formImages.push({ url, status: "ready", name: url.split("/").pop() || "imagen", error: null });
+  syncImgHidden();
+  renderImgPreviews();
 }
 
-async function uploadFileToPocketBase(file) {
-  const formData = new FormData();
-  formData.append("file", file);
-  const res = await fetch(`${PB_URL}/api/collections/product_images/records`, {
-    method: "POST",
-    body: formData,
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.message || "Error al subir la imagen");
-  }
-  const data = await res.json();
-  // PocketBase URL format: /api/files/COLLECTION_ID/RECORD_ID/FILENAME
-  return `${PB_URL}/api/files/${data.collectionId}/${data.id}/${data.file}`;
-}
-
-async function handleImageFiles(files) {
-  const zone = document.querySelector("#img-drop-zone");
-  const status = document.querySelector("#img-upload-status");
-  const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
-  const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
-
-  for (const file of files) {
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      if (status) status.textContent = `Error: Solo JPG, PNG o WEBP permitidos.`;
-      setTimeout(() => { if (status) status.textContent = ""; }, 3000);
-      continue;
-    }
-    if (file.size > MAX_SIZE) {
-      if (status) status.textContent = `Error: El archivo supera los 5MB.`;
-      setTimeout(() => { if (status) status.textContent = ""; }, 3000);
-      continue;
-    }
-
-    if (status) status.textContent = `Subiendo ${file.name}…`;
-    if (zone) zone.classList.add("uploading");
-    try {
-      const url = await uploadFileToPocketBase(file);
-      addImageUrl(url);
-      if (status) status.textContent = "✓ Subida correctamente";
-      setTimeout(() => { if (status) status.textContent = ""; }, 2000);
-    } catch (err) {
-      if (status) status.textContent = `Error: ${err.message}`;
-    } finally {
-      if (zone) zone.classList.remove("uploading");
-    }
-  }
-}
-
+// ── Inicializar zona de carga ─────────────
 function setupImageZone() {
-  const zone    = document.querySelector("#img-drop-zone");
-  const fileIn  = document.querySelector("#img-file-input");
-  const urlIn   = document.querySelector("#img-url-input");
-  const addBtn  = document.querySelector("#img-url-add");
+  const zone   = document.querySelector("#img-drop-zone");
+  const fileIn = document.querySelector("#img-file-input");
+  const urlIn  = document.querySelector("#img-url-input");
+  const addBtn = document.querySelector("#img-url-add");
 
   if (zone && fileIn) {
-    zone.addEventListener("click", () => fileIn.click());
-    zone.addEventListener("dragover", (e) => { e.preventDefault(); zone.classList.add("drag-over"); });
-    zone.addEventListener("dragleave", () => zone.classList.remove("drag-over"));
+    zone.addEventListener("click", (e) => {
+      // No disparar si el clic fue en uno de los botones internos
+      if (e.target.closest("button")) return;
+      if (!imgUploading) fileIn.click();
+    });
+
+    zone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      if (!imgUploading) zone.classList.add("drag-over");
+    });
+
+    zone.addEventListener("dragleave", (e) => {
+      if (!zone.contains(e.relatedTarget)) zone.classList.remove("drag-over");
+    });
+
     zone.addEventListener("drop", (e) => {
       e.preventDefault();
       zone.classList.remove("drag-over");
-      handleImageFiles([...e.dataTransfer.files]);
+      if (imgUploading) return;
+      // Solo procesar si hay archivos reales (no un reordenamiento interno)
+      const files = [...(e.dataTransfer.files || [])].filter((f) => f.type.startsWith("image/"));
+      if (files.length) uploadFilesToGitHub(files);
     });
+
     fileIn.addEventListener("change", () => {
-      handleImageFiles([...fileIn.files]);
+      const files = [...fileIn.files];
       fileIn.value = "";
+      if (files.length) uploadFilesToGitHub(files);
     });
   }
 
@@ -181,14 +567,127 @@ function setupImageZone() {
     }
     addBtn.addEventListener("click", doAddUrl);
     urlIn.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doAddUrl(); } });
-    urlIn.addEventListener("paste", () => setTimeout(() => {
-      if (urlIn.value.trim().startsWith("http")) doAddUrl();
-    }, 50));
+    urlIn.addEventListener("paste", () =>
+      setTimeout(() => { if (urlIn.value.trim().startsWith("http")) doAddUrl(); }, 60)
+    );
   }
 }
 
 // ════════════════════════════════════════
-//  CATEGORY PICKER (dropdown in form)
+//  GITHUB CONFIG CHECK
+//  Verifica al iniciar el panel si las
+//  variables de entorno están configuradas.
+// ════════════════════════════════════════
+
+// Estado de configuración: "unknown" | "ok" | "warning" | "error"
+let githubConfigStatus = "unknown";
+
+async function checkGitHubConfig() {
+  const banner   = document.querySelector("#github-config-banner");
+  const icon     = document.querySelector("#github-config-icon");
+  const msg      = document.querySelector("#github-config-msg");
+  const retryBtn = document.querySelector("#github-config-retry");
+  if (!banner) return;
+
+  // Mostrar banner en estado "cargando"
+  banner.hidden    = false;
+  banner.className = "github-config-banner loading";
+  icon.textContent = "⟳";
+  msg.textContent  = "Verificando configuración de GitHub…";
+  if (retryBtn) retryBtn.hidden = true;
+
+  try {
+    const data = await api("/api/admin/check-config");
+
+    githubConfigStatus = data.status;  // "ok" | "incomplete" | "error"
+
+    if (data.ok) {
+      // Todo ok — mostrar brevemente y ocultar
+      banner.className = "github-config-banner ok";
+      icon.textContent = "✓";
+      msg.textContent  = "GitHub conectado · imágenes se subirán a " +
+                         (data.github?.repo || "photoscanopia");
+      if (retryBtn) retryBtn.hidden = true;
+
+      // Ocultar tras 4 segundos si todo está bien
+      setTimeout(() => {
+        if (githubConfigStatus === "ok") banner.hidden = true;
+      }, 4000);
+
+      // Con token válido: escanear imágenes legacy silenciosamente
+      // y mostrar el panel de migración solo si hay algo que migrar
+      scanLegacyImagesBackground();
+
+    } else {
+      // Error o configuración incompleta — mantener visible con detalle
+      banner.className = data.status === "error"
+        ? "github-config-banner error"
+        : "github-config-banner warning";
+
+      // Encontrar el primer check fallido para mostrar el mensaje más útil
+      const firstFail = (data.checks || []).find(
+        (c) => c.status === "error" || c.status === "missing"
+      );
+
+      icon.textContent = data.status === "error" ? "✕" : "⚠";
+      msg.textContent  = firstFail?.message || data.summary || "Configuración incompleta.";
+
+      if (retryBtn) {
+        retryBtn.hidden = false;
+        retryBtn.onclick = checkGitHubConfig;
+      }
+
+      // Deshabilitar zona de imágenes si el token está ausente o inválido
+      const tokenCheck = (data.checks || []).find((c) => c.key === "GITHUB_TOKEN");
+      if (tokenCheck && (tokenCheck.status === "error" || tokenCheck.status === "missing")) {
+        disableImageZone(firstFail?.message || "Configurá GITHUB_TOKEN para subir imágenes.");
+      }
+    }
+  } catch (err) {
+    githubConfigStatus = "error";
+    banner.className   = "github-config-banner error";
+    icon.textContent   = "✕";
+    msg.textContent    = `No se pudo verificar la configuración: ${err.message}`;
+    if (retryBtn) {
+      retryBtn.hidden = false;
+      retryBtn.onclick = checkGitHubConfig;
+    }
+  }
+}
+
+// Deshabilitar visualmente la zona de drop con mensaje explicativo
+function disableImageZone(reason) {
+  const zone    = document.querySelector("#img-drop-zone");
+  const fileIn  = document.querySelector("#img-file-input");
+  if (!zone) return;
+
+  zone.classList.add("disabled");
+  zone.title = reason;
+  // Reemplazar texto del hint
+  const hint = zone.querySelector(".img-drop-hint");
+  if (hint) hint.textContent = reason;
+  // Deshabilitar el input de archivo
+  if (fileIn) fileIn.disabled = true;
+}
+
+// Escanear en background y mostrar el panel solo si hay legacy
+async function scanLegacyImagesBackground() {
+  try {
+    const data = await api("/api/admin/migrate-images");
+    if (data.flagged > 0) {
+      showMigrationPanel(true);
+      const summary = document.querySelector("#migration-summary");
+      const badge   = document.querySelector("#migration-count-badge");
+      if (summary) summary.textContent = data.summary || "";
+      if (badge)   { badge.textContent = data.flagged; badge.hidden = false; }
+      // Trigger full render
+      await scanLegacyImages();
+    }
+  } catch {
+    // Silencioso — el escaneo background no debe interrumpir el flujo normal
+  }
+}
+
 // ════════════════════════════════════════
 function setupCatPicker() {
   const input    = document.querySelector("#cat-input");
@@ -261,6 +760,7 @@ function showAdmin() {
   document.querySelector("#admin").hidden = false;
   setupImageZone();
   setupCatPicker();
+  checkGitHubConfig();     // verificar configuración de GitHub al iniciar
   loadAll();
   refreshRecoveryBadge();
   setTimeout(loadNotifications, 1500); // cargar notifs después de que carguen los productos
@@ -324,12 +824,16 @@ function renderDashboard() {
   if (!el) return;
   const featured = products.filter((p) => p.featured).slice(0, 6);
   if (!featured.length) { el.innerHTML = `<p class="muted-text" style="padding:12px 0">No hay productos destacados.</p>`; return; }
-  el.innerHTML = `<div class="dash-grid">${featured.map((p) => `
+  el.innerHTML = `<div class="dash-grid">${featured.map((p) => {
+    const imgs = p.images?.length ? p.images : parseImages(p.image);
+    const thumb = imgs[0] || "";
+    return `
     <div class="dash-card">
-      <div class="dash-img">${p.image ? `<img src="${escapeHtml(p.image)}" alt="" />` : "🌿"}</div>
+      <div class="dash-img">${thumb ? `<img src="${escapeHtml(thumb)}" alt="" loading="lazy" />` : "🌿"}</div>
       <div class="dash-info"><strong>${escapeHtml(p.name)}</strong><span class="cat-badge">${escapeHtml(p.category)}</span></div>
       <div class="dash-meta"><span class="price-cell">${money.format(p.price)}</span><span class="${Number(p.stock) === 0 ? "stock-zero" : "muted-text"}">Stock: ${p.stock}</span></div>
-    </div>`).join("")}</div>`;
+    </div>`;
+  }).join("")}</div>`;
 }
 
 // ════════════════════════════════════════
@@ -558,10 +1062,12 @@ function renderInventory() {
   body.innerHTML = sorted.map((p) => {
     const s = Number(p.stock);
     const badge = s === 0 ? ["Sin stock","color:var(--red)"] : s <= 5 ? ["Stock bajo","color:#f0a500"] : ["OK","color:var(--lime)"];
+    const imgs  = p.images?.length ? p.images : parseImages(p.image);
+    const thumb = imgs[0] || "";
     return `<tr>
       <td><div class="prod-cell">
         <div class="prod-img" style="display:inline-flex;align-items:center;justify-content:center;font-size:16px;">
-          ${p.image ? `<img src="${escapeHtml(p.image)}" alt="" style="width:36px;height:36px;border-radius:6px;object-fit:cover;" />` : "🌿"}
+          ${thumb ? `<img src="${escapeHtml(thumb)}" alt="" style="width:36px;height:36px;border-radius:6px;object-fit:cover;" loading="lazy" />` : "🌿"}
         </div>
         <div><strong>${escapeHtml(p.name)}</strong><small>${escapeHtml(p.id)}</small></div>
       </div></td>
@@ -595,10 +1101,11 @@ function renderProducts() {
   const pageItems = filteredProducts.slice(start, start + PAGE_SIZE);
 
   body.innerHTML = pageItems.map((p) => {
-    const imgs = parseImages(p.image);
+    // Soportar campo images[] (nuevo) o image (legacy)
+    const imgs = p.images?.length ? p.images : parseImages(p.image);
     const thumb = imgs[0] || "";
     const imgHtml = thumb
-      ? `<img class="prod-img" src="${escapeHtml(thumb)}" alt="" />`
+      ? `<img class="prod-img" src="${escapeHtml(thumb)}" alt="" loading="lazy" />`
       : `<div class="prod-img" style="display:inline-flex;align-items:center;justify-content:center;font-size:18px;">🌿</div>`;
     return `<tr>
       <td><div class="prod-cell">${imgHtml}<div>
@@ -688,8 +1195,15 @@ function fillForm(product = {}) {
   form.featured.checked  = Boolean(product.featured);
   form.visible.checked   = product.visible !== false;
 
-  // images
-  formImages = parseImages(product.image);
+  // images — convertir URLs planas al nuevo formato de objeto
+  const rawUrls = parseImages(product.image);
+  formImages = rawUrls.map((url) => ({
+    url,
+    status: "ready",
+    name: url.split("/").pop() || "imagen",
+    error: null,
+    localPreview: null,
+  }));
   syncImgHidden();
   renderImgPreviews();
 
@@ -701,18 +1215,36 @@ async function saveProduct(event) {
   event.preventDefault();
   const form  = event.currentTarget;
   const state = document.querySelector("#save-state");
+
+  // Bloquear si hay subidas en curso
+  if (imgUploading) {
+    state.textContent = "⚠ Esperá a que terminen las subidas…";
+    setTimeout(() => { state.textContent = ""; }, 3000);
+    return;
+  }
+
+  // Advertir si hay imágenes con error pendientes
+  const errorImgs = formImages.filter((img) => img.status === "error");
+  if (errorImgs.length) {
+    state.textContent = `⚠ Hay ${errorImgs.length} imagen${errorImgs.length !== 1 ? "es" : ""} con error. Podés reintentarlas o eliminarlas.`;
+    setTimeout(() => { state.textContent = ""; }, 4000);
+    return;
+  }
+
   const payload = Object.fromEntries(new FormData(form).entries());
   payload.price    = Number(payload.price    || 0);
   payload.stock    = Number(payload.stock    || 0);
   payload.featured = form.featured.checked;
   payload.visible  = form.visible.checked;
-  // payload.image already contains the serialized images from #img-hidden
+  // payload.image ya contiene las URLs serializadas desde #img-hidden
 
   state.textContent = "Guardando…";
   try {
     await api("/api/admin/products", { method: "POST", body: JSON.stringify(payload) });
     state.textContent = "✓ Guardado";
     setTimeout(() => { state.textContent = ""; }, 3000);
+    // Limpiar previews locales
+    formImages.forEach((img) => { if (img.localPreview) URL.revokeObjectURL(img.localPreview); });
     await loadProducts();
   } catch (error) { state.textContent = error.message; }
 }
@@ -1249,6 +1781,160 @@ function escapeHtml(str) {
 }
 
 // ════════════════════════════════════════
+//  MIGRACIÓN DE IMÁGENES LEGACY
+//  Detecta y migra imágenes en URLs
+//  temporales (PocketBase, trycloudflare)
+//  a GitHub de forma segura.
+// ════════════════════════════════════════
+
+// Mostrar u ocultar el panel de migración desde cualquier sección
+function showMigrationPanel(show = true) {
+  const panel = document.querySelector("#migration-panel");
+  if (panel) panel.hidden = !show;
+}
+
+async function scanLegacyImages() {
+  const summary  = document.querySelector("#migration-summary");
+  const list     = document.querySelector("#migration-list");
+  const badge    = document.querySelector("#migration-count-badge");
+  const scanBtn  = document.querySelector("#migration-scan-btn");
+
+  if (!summary || !list) return;
+
+  if (scanBtn) { scanBtn.disabled = true; scanBtn.textContent = "Escaneando…"; }
+  summary.textContent = "Analizando productos…";
+  list.innerHTML      = "";
+
+  try {
+    const data = await api("/api/admin/migrate-images");
+
+    summary.textContent = data.summary || "";
+
+    if (badge) {
+      badge.textContent = data.flagged > 0 ? data.flagged : "";
+      badge.hidden      = data.flagged === 0;
+    }
+
+    if (!data.flagged || data.products.length === 0) {
+      list.innerHTML = `<div class="migration-all-ok">
+        <span style="font-size:2rem">✅</span>
+        <p>Todos los productos usan URLs permanentes.</p>
+        <p class="muted-text">No hay imágenes legacy que migrar.</p>
+      </div>`;
+      return;
+    }
+
+    list.innerHTML = data.products.map((p) => `
+      <div class="migration-product" id="migprod-${escapeHtml(p.id)}">
+        <div class="migration-product-head">
+          <strong>${escapeHtml(p.name)}</strong>
+          <span class="cat-badge">${escapeHtml(p.id)}</span>
+          <span class="muted-text">${p.legacyImages.length} imagen${p.legacyImages.length !== 1 ? "es" : ""} legacy de ${p.totalImages}</span>
+        </div>
+        <div class="migration-images">
+          ${p.legacyImages.map((url) => `
+            <div class="migration-img-row" id="migrow-${btoa(url).slice(0, 20).replace(/[^a-zA-Z0-9]/g, '')}">
+              <img class="migration-thumb" src="${escapeHtml(url)}" alt=""
+                   onerror="this.style.opacity='0.2';this.title='URL inaccesible'"
+                   loading="lazy" />
+              <div class="migration-img-info">
+                <span class="migration-url" title="${escapeHtml(url)}">${escapeHtml(url.length > 60 ? url.slice(0, 57) + "…" : url)}</span>
+                <span class="migration-img-status" data-url="${escapeHtml(url)}"></span>
+              </div>
+              <button type="button" class="btn-ghost btn-sm migration-migrate-btn"
+                      data-product-id="${escapeHtml(p.id)}"
+                      data-url="${escapeHtml(url)}">
+                Migrar →
+              </button>
+            </div>`).join("")}
+        </div>
+        <div class="migration-product-actions">
+          <button type="button" class="btn-primary btn-sm migration-migrate-all-btn"
+                  data-product-id="${escapeHtml(p.id)}"
+                  data-urls="${escapeHtml(JSON.stringify(p.legacyImages))}">
+            Migrar todas las imágenes de este producto
+          </button>
+        </div>
+      </div>`).join("");
+
+    // ── Listeners: migrar imagen individual ──────
+    list.querySelectorAll(".migration-migrate-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        migrateSingleImage(btn.dataset.productId, btn.dataset.url, btn);
+      });
+    });
+
+    // ── Listeners: migrar todas de un producto ───
+    list.querySelectorAll(".migration-migrate-all-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const urls = JSON.parse(btn.dataset.urls || "[]");
+        btn.disabled = true;
+        btn.textContent = "Migrando…";
+        for (const url of urls) {
+          // Buscar el botón individual de esa URL y simular clic
+          const row = list.querySelector(`.migration-migrate-btn[data-url="${CSS.escape(url)}"]`);
+          if (row && !row.disabled) {
+            await migrateSingleImage(btn.dataset.productId, url, row);
+          }
+        }
+        btn.textContent = "✓ Completado";
+        // Refrescar el escaneo después de migrar todo
+        setTimeout(() => scanLegacyImages(), 1200);
+      });
+    });
+
+  } catch (err) {
+    summary.textContent = `Error al escanear: ${err.message}`;
+    list.innerHTML = `<p style="color:var(--red);padding:8px 0">${escapeHtml(err.message)}</p>`;
+  } finally {
+    if (scanBtn) { scanBtn.disabled = false; scanBtn.textContent = "↺ Escanear productos"; }
+  }
+}
+
+async function migrateSingleImage(productId, url, btn) {
+  const statusEl = btn?.closest(".migration-img-row")?.querySelector(".migration-img-status");
+
+  if (btn) { btn.disabled = true; btn.textContent = "Migrando…"; }
+  if (statusEl) { statusEl.textContent = "Subiendo…"; statusEl.className = "migration-img-status uploading"; }
+
+  try {
+    const data = await api("/api/admin/migrate-images", {
+      method: "POST",
+      body: JSON.stringify({ productId, imageUrl: url }),
+    });
+
+    if (statusEl) {
+      statusEl.textContent = "✓ Migrada";
+      statusEl.className   = "migration-img-status ok";
+    }
+    if (btn) {
+      btn.textContent  = "✓ Listo";
+      btn.className    = "btn-ghost btn-sm";
+      btn.style.color  = "var(--lime)";
+    }
+
+    // Actualizar la lista de productos en memoria
+    const prod = products.find((p) => p.id === productId);
+    if (prod && data.newUrl) {
+      const imgs = parseImages(prod.image);
+      prod.image = imgs.map((u) => u === url ? data.newUrl : u).join(",");
+    }
+
+    return data.newUrl;
+  } catch (err) {
+    if (statusEl) {
+      statusEl.textContent = `✕ ${err.message.slice(0, 40)}`;
+      statusEl.className   = "migration-img-status error";
+    }
+    if (btn) {
+      btn.disabled    = false;
+      btn.textContent = "Reintentar";
+    }
+    return null;
+  }
+}
+
+// ════════════════════════════════════════
 //  EVENT LISTENERS
 // ════════════════════════════════════════
 document.querySelector("#login-form").addEventListener("submit", async (event) => {
@@ -1286,6 +1972,7 @@ document.querySelector("#recovery-refresh")?.addEventListener("click", loadRecov
 document.querySelector("#report-refresh")?.addEventListener("click", loadReports);
 document.querySelector("#report-groq-btn")?.addEventListener("click", generateGroqReport);
 document.querySelector("#notif-refresh")?.addEventListener("click", loadNotifications);
+document.querySelector("#migration-scan-btn")?.addEventListener("click", scanLegacyImages);
 
 document.querySelectorAll(".nav-item").forEach((item) => {
   item.addEventListener("click", () => {

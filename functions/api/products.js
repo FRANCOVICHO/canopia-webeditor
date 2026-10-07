@@ -11,19 +11,33 @@ export async function onRequestOptions() {
   });
 }
 
+// ── Parsear el campo image (string URL o JSON array serializado) ───────────
+function parseImages(raw) {
+  if (!raw) return [];
+  const s = String(raw).trim();
+  if (s.startsWith("[")) {
+    try { return JSON.parse(s).filter(Boolean); } catch { return [s]; }
+  }
+  return s ? [s] : [];
+}
+
 function mapProduct(row) {
+  const images = parseImages(row.image);
   return {
-    id: row.id,
-    name: row.name,
-    category: row.category,
+    id:          row.id,
+    name:        row.name,
+    category:    row.category,
     description: row.description,
-    price: row.price,
-    tag: row.tag,
-    image: row.image,
-    featured: Boolean(row.featured),
-    visible: Boolean(row.visible),
-    stock: row.stock,
-    updated_at: row.updated_at,
+    price:       row.price,
+    tag:         row.tag,
+    // image = primera URL o el valor original — mantener para backward compat
+    image:       images[0] || row.image || "",
+    // images[] = array completo ya parseado, nunca undefined
+    images,
+    featured:    Boolean(row.featured),
+    visible:     Boolean(row.visible),
+    stock:       row.stock,
+    updated_at:  row.updated_at,
   };
 }
 
@@ -44,7 +58,7 @@ export async function onRequestGet({ env }) {
 
   return Response.json(
     {
-      products: results.map(mapProduct),
+      products:  results.map(mapProduct),
       updatedAt: await getCatalogMeta(env),
     },
     {
