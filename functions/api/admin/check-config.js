@@ -13,6 +13,11 @@ export async function onRequestGet({ request, env }) {
   const denied = assertAdmin(request, env);
   if (denied) return denied;
 
+  // Diagnóstico: listar TODAS las keys del env (sin valores — solo nombres)
+  // para confirmar exactamente qué variables llegaron al Worker en este deploy.
+  const envKeys = Object.keys(env || {});
+  console.log("[check-config] env keys:", envKeys);
+
   const SUPABASE_URL = env.SUPABASE_URL;
   const SUPABASE_KEY = env.SUPABASE_SERVICE_ROLE_KEY;
   const BUCKET       = "product-images";
@@ -46,7 +51,7 @@ export async function onRequestGet({ request, env }) {
       // Diagnóstico extra: listar las keys del env que SÍ llegan
       // para detectar errores de nombre (ej: SUPABASE_SERVICE_KEY vs SUPABASE_SERVICE_ROLE_KEY)
       message: `No configurada. Agregar como variable Encrypted en Cloudflare Pages → Settings → Environment Variables → Production. Nombre exacto requerido: SUPABASE_SERVICE_ROLE_KEY`,
-      hint: `Variables de entorno que sí llegan al Worker: ${Object.keys(env).filter(k => !k.toLowerCase().includes("key") && !k.toLowerCase().includes("token") && !k.toLowerCase().includes("password") && !k.toLowerCase().includes("secret")).join(", ") || "(ninguna no-secreta detectada)"}`,
+      hint: `Todas las keys del env en este deploy: ${Object.keys(env).join(", ") || "(env vacío)"}`,
     });
   } else {
     checks.push({
