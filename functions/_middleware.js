@@ -62,13 +62,22 @@ export async function onRequest(context) {
     }
   }
 
+  // ── LOG DIAGNÓSTICO TEMPORAL ──────────────────────────────────────────────
+  // Estos logs aparecen en Cloudflare Pages → Functions → Logs (Real-time).
+  // NO imprime body, token ni secretos — solo método, path y status.
+  // Remover este bloque una vez confirmado el correcto funcionamiento.
+  const url      = new URL(request.url);
+  const logLabel = `[middleware] ${request.method} ${url.pathname}`;
+  console.log(`${logLabel} — antes de next()`);
+  // ─────────────────────────────────────────────────────────────────────────
+
   // Ejecutar el handler de la ruta
   let response;
   try {
     response = await next();
   } catch (err) {
     // Excepción no capturada en el handler → 500 con JSON legible
-    console.error("[middleware] Excepción no capturada:", err.message, err.stack);
+    console.error(`${logLabel} — excepción no capturada:`, err.message, err.stack);
     return new Response(
       JSON.stringify({ error: err.message, traceId }),
       {
@@ -77,6 +86,10 @@ export async function onRequest(context) {
       }
     );
   }
+
+  // ── LOG DIAGNÓSTICO TEMPORAL ──────────────────────────────────────────────
+  console.log(`${logLabel} — response recibida del handler, status: ${response.status}`);
+  // ─────────────────────────────────────────────────────────────────────────
 
   // ── Agregar headers de CORS/seguridad a la respuesta del handler ──────────
   //
@@ -94,6 +107,10 @@ export async function onRequest(context) {
   for (const [key, value] of Object.entries(securityHeaders)) {
     newResponse.headers.set(key, value);
   }
+
+  // ── LOG DIAGNÓSTICO TEMPORAL ──────────────────────────────────────────────
+  console.log(`${logLabel} — newResponse construida, status final: ${newResponse.status}, Content-Type: ${newResponse.headers.get("Content-Type")}`);
+  // ─────────────────────────────────────────────────────────────────────────
 
   return newResponse;
 }
