@@ -184,10 +184,9 @@ async function uploadToSupabase({ buffer, filename, mimeType, supabaseUrl, servi
     method:  "POST",
     headers: {
       Authorization:  `Bearer ${serviceKey}`,
+      apikey:          serviceKey,
       "Content-Type": mimeType,
-      // x-upsert: false garantiza que nunca sobreescribe — si el nombre
-      // ya existe (colisión de random) Supabase devuelve error 409.
-      "x-upsert": "false",
+      "x-upsert":     "false",
     },
     body: buffer,
   });
