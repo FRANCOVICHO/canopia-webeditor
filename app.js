@@ -219,7 +219,10 @@ function renderImgPreviews() {
       e.preventDefault();
       e.stopPropagation(); // evitar que archivos externos lleguen al zone handler
       // Si hay archivos reales del sistema (no drag interno), subirlos en lugar de reordenar
-      const extFiles = [...(e.dataTransfer.files || [])].filter((f) => f.type.startsWith("image/"));
+      const extFiles = [...(e.dataTransfer.files || [])].filter((f) => {
+        const mime = resolveFileMime(f);
+        return mime.startsWith("image/");
+      });
       if (extFiles.length) {
         imgDragSrcIdx = null;
         uploadFilesToGitHub(extFiles);
@@ -238,11 +241,28 @@ function renderImgPreviews() {
   syncImgHidden();
 }
 
+// ── Inferir MIME type por extensión cuando file.type viene vacío ─────────
+// Algunos browsers (Safari iOS, drag desde Finder/Explorer) no populan
+// file.type. La extensión del nombre es el fallback confiable.
+function mimeFromExtension(filename) {
+  const ext = (filename || "").split(".").pop().toLowerCase();
+  const map = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp" };
+  return map[ext] || "";
+}
+
+function resolveFileMime(file) {
+  const declared = (file.type || "").toLowerCase();
+  return declared || mimeFromExtension(file.name);
+}
+
 // ── Validar archivo antes de subir ───────
 function validateImageFile(file) {
   if (!file || !(file instanceof File)) return "Archivo inválido.";
-  const mime = (file.type || "").toLowerCase();
-  if (!IMG_ALLOWED_TYPES.has(mime)) return `Formato no permitido: ${mime || "desconocido"}. Solo JPG, PNG o WEBP.`;
+  const mime = resolveFileMime(file);
+  if (!IMG_ALLOWED_TYPES.has(mime)) {
+    const label = mime || `sin tipo (extensión: .${(file.name || "").split(".").pop()})`;
+    return `Formato no permitido: ${label}. Solo JPG, PNG o WEBP.`;
+  }
   if (file.size > IMG_MAX_SIZE) return `El archivo supera ${IMG_MAX_SIZE_MB} MB.`;
   return null; // ok
 }
@@ -548,7 +568,10 @@ function setupImageZone() {
       zone.classList.remove("drag-over");
       if (imgUploading) return;
       // Solo procesar si hay archivos reales (no un reordenamiento interno)
-      const files = [...(e.dataTransfer.files || [])].filter((f) => f.type.startsWith("image/"));
+      const files = [...(e.dataTransfer.files || [])].filter((f) => {
+        const mime = resolveFileMime(f);
+        return mime.startsWith("image/");
+      });
       if (files.length) uploadFilesToGitHub(files);
     });
 

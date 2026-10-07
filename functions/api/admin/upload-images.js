@@ -48,6 +48,21 @@ const ALLOWED_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/we
 const MAX_RETRIES   = 3;
 const RETRY_BASE_MS = 800; // backoff exponencial base
 
+// ── Inferir MIME por extensión (fallback cuando file.type viene vacío) ─────
+// Cloudflare Workers recibe el file.type tal como lo envió el browser.
+// En algunos casos (Safari iOS, drag desde Finder/Explorer en Windows) el
+// browser no setea Content-Type en la parte multipart → llega como "".
+function mimeFromFilename(filename) {
+  const ext = String(filename || "").split(".").pop().toLowerCase();
+  const map = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp" };
+  return map[ext] || "";
+}
+
+function resolveFileMime(file) {
+  const declared = (file.type || "").toLowerCase();
+  return declared || mimeFromFilename(file.name);
+}
+
 // ── Handler principal ──────────────────────────────────────────────────────
 export async function onRequestPost({ request, env }) {
   const denied = assertAdmin(request, env);
@@ -97,18 +112,28 @@ export async function onRequestPost({ request, env }) {
     }
 
     const filename = file.name || `imagen-${i + 1}`;
-    const mimeType = (file.type || "").toLowerCase();
+    // resolveFileMime usa file.type si existe; sino infiere por extensión.
+    // Necesario porque algunos browsers (Safari iOS, drag desde Finder/Explorer)
+    // no populan el Content-Type en las partes multipart → llega como "".
+    const mimeType = resolveFileMime(file);
     const sizeKB   = Math.round(file.size / 1024);
 
-    console.log(`[upload] Procesando imagen ${i + 1}/${files.length}: "${filename}" (${sizeKB} KB, ${mimeType})`);
+    // LOG DIAGNÓSTICO — muestra name, type declarado, mime resuelto y tamaño.
+    // No imprime contenido ni secretos.
+    console.log(
+      `[upload] Imagen ${i + 1}/${files.length}: ` +
+      `name="${filename}" | type declarado="${file.type || "(vacío)"}" | mime resuelto="${mimeType}" | ${sizeKB} KB`
+    );
 
     // ── Validaciones ──────────────────────────────────────────────────────
     if (!ALLOWED_TYPES.has(mimeType)) {
-      console.warn(`[upload] "${filename}": formato no permitido (${mimeType})`);
-      failures.push({ filename, error: `Formato no permitido: ${mimeType || "desconocido"}. Solo JPG, PNG o WEBP.` });
+      console.warn(`[upload] "${filename}": formato rechazado — mime="${mimeType}", extensión=".${filename.split(".").pop()}"`);
+      failures.push({
+        filename,
+        error: `Formato no permitido: ${mimeType || `extensión .${filename.split(".").pop()}`}. Solo JPG, PNG o WEBP.`,
+      });
       continue;
     }
-
     if (file.size > MAX_FILE_SIZE) {
       console.warn(`[upload] "${filename}": supera el límite (${sizeKB} KB > ${MAX_FILE_SIZE / 1024} KB)`);
       failures.push({ filename, error: `El archivo supera los ${MAX_FILE_SIZE / 1024 / 1024} MB (${sizeKB} KB recibidos).` });
