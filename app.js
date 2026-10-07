@@ -45,7 +45,7 @@ function getCategoryNames() {
 
 // ════════════════════════════════════════
 //  IMAGE GALLERY UPLOADER
-//  Subida automática a GitHub vía backend.
+//  Subida automática a Supabase Storage.
 //  Drag & drop múltiple, reordenamiento,
 //  progreso individual, reintentos, galería.
 // ════════════════════════════════════════
@@ -225,7 +225,7 @@ function renderImgPreviews() {
       });
       if (extFiles.length) {
         imgDragSrcIdx = null;
-        uploadFilesToGitHub(extFiles);
+        uploadImages(extFiles);
         return;
       }
       const destIdx = Number(item.dataset.idx);
@@ -273,7 +273,7 @@ function isDuplicate(file) {
 }
 
 // ── Subir un lote de archivos al backend ──
-async function uploadFilesToGitHub(files) {
+async function uploadImages(files) {
   if (!files.length) return;
 
   const statusEl  = document.querySelector("#img-upload-status");
@@ -350,17 +350,6 @@ async function uploadFilesToGitHub(files) {
 
     try {
       const fd = new FormData();
-      // Log diagnóstico — confirmar que file es un File real antes de enviar
-      console.log("[UPLOAD DEBUG] uploadFilesToGitHub fd.append", {
-        constructor: file?.constructor?.name,
-        name: file?.name,
-        size: file?.size,
-        type: file?.type,
-        isFile: file instanceof File,
-      });
-      // Siempre pasar el filename explícito como tercer arg.
-      // Sin él, algunos browsers envían la parte sin "filename" en el
-      // Content-Disposition y Cloudflare Workers lo parsea como string.
       fd.append("files", file, file.name || "imagen.jpg");
 
       const res  = await fetch(IMG_UPLOAD_ENDPOINT, {
@@ -383,7 +372,6 @@ async function uploadFilesToGitHub(files) {
       const img = formImages[entryIdx];
       img.url    = urls[0];
       img.status = "done";
-      // Mantener localPreview mientras la imagen de GitHub carga
     } catch (err) {
       const img = formImages[entryIdx];
       img.status = "error";
@@ -428,13 +416,6 @@ async function retryFailedImage(idx) {
 
   try {
     const fd = new FormData();
-    console.log("[UPLOAD DEBUG] retryFailedImage fd.append", {
-      constructor: img._file?.constructor?.name,
-      name: img._file?.name,
-      size: img._file?.size,
-      type: img._file?.type,
-      isFile: img._file instanceof File,
-    });
     fd.append("files", img._file, img._file?.name || "imagen.jpg");
 
     const res  = await fetch(IMG_UPLOAD_ENDPOINT, {
@@ -498,13 +479,6 @@ function triggerReplaceFile(idx) {
 
     try {
       const fd = new FormData();
-      console.log("[UPLOAD DEBUG] triggerReplaceFile fd.append", {
-        constructor: file?.constructor?.name,
-        name: file?.name,
-        size: file?.size,
-        type: file?.type,
-        isFile: file instanceof File,
-      });
       fd.append("files", file, file.name || "imagen.jpg");
 
       const res  = await fetch(IMG_UPLOAD_ENDPOINT, {
@@ -597,13 +571,13 @@ function setupImageZone() {
         const mime = resolveFileMime(f);
         return mime.startsWith("image/");
       });
-      if (files.length) uploadFilesToGitHub(files);
+      if (files.length) uploadImages(files);
     });
 
     fileIn.addEventListener("change", () => {
       const files = [...fileIn.files];
       fileIn.value = "";
-      if (files.length) uploadFilesToGitHub(files);
+      if (files.length) uploadImages(files);
     });
   }
 
@@ -622,57 +596,49 @@ function setupImageZone() {
 }
 
 // ════════════════════════════════════════
-//  GITHUB CONFIG CHECK
+//  STORAGE CONFIG CHECK
 //  Verifica al iniciar el panel si las
-//  variables de entorno están configuradas.
+//  variables de Supabase están configuradas.
 // ════════════════════════════════════════
 
 // Estado de configuración: "unknown" | "ok" | "warning" | "error"
-let githubConfigStatus = "unknown";
+let storageConfigStatus = "unknown";
 
-async function checkGitHubConfig() {
+async function checkStorageConfig() {
   const banner   = document.querySelector("#github-config-banner");
   const icon     = document.querySelector("#github-config-icon");
   const msg      = document.querySelector("#github-config-msg");
   const retryBtn = document.querySelector("#github-config-retry");
   if (!banner) return;
 
-  // Mostrar banner en estado "cargando"
   banner.hidden    = false;
   banner.className = "github-config-banner loading";
   icon.textContent = "⟳";
-  msg.textContent  = "Verificando configuración de GitHub…";
+  msg.textContent  = "Verificando configuración de Supabase…";
   if (retryBtn) retryBtn.hidden = true;
 
   try {
     const data = await api("/api/admin/check-config");
 
-    githubConfigStatus = data.status;  // "ok" | "incomplete" | "error"
+    storageConfigStatus = data.status;
 
     if (data.ok) {
-      // Todo ok — mostrar brevemente y ocultar
       banner.className = "github-config-banner ok";
       icon.textContent = "✓";
-      msg.textContent  = "GitHub conectado · imágenes se subirán a " +
-                         (data.github?.repo || "photoscanopia");
+      msg.textContent  = `Supabase conectado · imágenes se subirán al bucket "${data.storage?.bucket || "product-images"}"`;
       if (retryBtn) retryBtn.hidden = true;
 
-      // Ocultar tras 4 segundos si todo está bien
       setTimeout(() => {
-        if (githubConfigStatus === "ok") banner.hidden = true;
+        if (storageConfigStatus === "ok") banner.hidden = true;
       }, 4000);
 
-      // Con token válido: escanear imágenes legacy silenciosamente
-      // y mostrar el panel de migración solo si hay algo que migrar
       scanLegacyImagesBackground();
 
     } else {
-      // Error o configuración incompleta — mantener visible con detalle
       banner.className = data.status === "error"
         ? "github-config-banner error"
         : "github-config-banner warning";
 
-      // Encontrar el primer check fallido para mostrar el mensaje más útil
       const firstFail = (data.checks || []).find(
         (c) => c.status === "error" || c.status === "missing"
       );
@@ -681,24 +647,27 @@ async function checkGitHubConfig() {
       msg.textContent  = firstFail?.message || data.summary || "Configuración incompleta.";
 
       if (retryBtn) {
-        retryBtn.hidden = false;
-        retryBtn.onclick = checkGitHubConfig;
+        retryBtn.hidden  = false;
+        retryBtn.onclick = checkStorageConfig;
       }
 
-      // Deshabilitar zona de imágenes si el token está ausente o inválido
-      const tokenCheck = (data.checks || []).find((c) => c.key === "GITHUB_TOKEN");
-      if (tokenCheck && (tokenCheck.status === "error" || tokenCheck.status === "missing")) {
-        disableImageZone(firstFail?.message || "Configurá GITHUB_TOKEN para subir imágenes.");
+      // Deshabilitar zona si faltan las variables críticas de Supabase
+      const hasStorageError = (data.checks || []).some(
+        (c) => (c.key === "SUPABASE_URL" || c.key === "SUPABASE_SERVICE_ROLE_KEY" || c.key === "bucket")
+              && (c.status === "error" || c.status === "missing")
+      );
+      if (hasStorageError) {
+        disableImageZone(firstFail?.message || "Configurá SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY para subir imágenes.");
       }
     }
   } catch (err) {
-    githubConfigStatus = "error";
-    banner.className   = "github-config-banner error";
-    icon.textContent   = "✕";
-    msg.textContent    = `No se pudo verificar la configuración: ${err.message}`;
+    storageConfigStatus = "error";
+    banner.className    = "github-config-banner error";
+    icon.textContent    = "✕";
+    msg.textContent     = `No se pudo verificar la configuración: ${err.message}`;
     if (retryBtn) {
-      retryBtn.hidden = false;
-      retryBtn.onclick = checkGitHubConfig;
+      retryBtn.hidden  = false;
+      retryBtn.onclick = checkStorageConfig;
     }
   }
 }
@@ -808,7 +777,7 @@ function showAdmin() {
   document.querySelector("#admin").hidden = false;
   setupImageZone();
   setupCatPicker();
-  checkGitHubConfig();     // verificar configuración de GitHub al iniciar
+  checkStorageConfig();     // verificar configuración de Supabase al iniciar
   loadAll();
   refreshRecoveryBadge();
   setTimeout(loadNotifications, 1500); // cargar notifs después de que carguen los productos

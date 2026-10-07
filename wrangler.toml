@@ -6,37 +6,15 @@ binding       = "canopia_db"
 database_name = "canopia-db"
 database_id   = "a47f1a66-798c-4620-8c0b-36633ad81675"
 
-# ── Límite de CPU ────────────────────────────────────────────────────────────
-# Por defecto Cloudflare Pages Functions hereda el límite del plan "Bundled"
-# (legacy) de 50ms de CPU, lo que causa 502 al subir varias imágenes (la
-# conversión a base64 de 4 imágenes de ~3MB consumía ~72ms).
-#
-# Este bloque sube el límite al máximo del Workers Paid plan (30 segundos).
-# Solo aplica si el proyecto está en Workers Paid / Pages con Functions.
-#
-# Nota: Cloudflare Pages no usa [limits] directamente en wrangler.toml para
-# Pages Functions — el ajuste de CPU se hace desde el dashboard:
-#   Workers & Pages → canopia-webeditor → Settings → General → CPU time limit
-# Dejamos este bloque como documentación del valor correcto a configurar.
-#
-# [limits]
-# cpu_ms = 30000   # 30 segundos (máximo por defecto en Workers Paid)
-#
 # ── Variables de entorno ─────────────────────────────────────────────────────
 # Los valores NO-secretos van aquí como [vars].
-# Los secretos (GITHUB_TOKEN, ADMIN_PASSWORD) NUNCA van aquí — se configuran
-# en Cloudflare Pages → Settings → Environment Variables como "Encrypted".
+# Los secretos NUNCA van aquí — se configuran en:
+#   Cloudflare Pages → Settings → Environment Variables → Add variable → Encrypt
 #
-# Pasos para configurar los secretos:
-#   1. Ir a https://dash.cloudflare.com → Pages → canopia-webeditor
-#   2. Settings → Environment Variables → Add variable (Production + Preview)
-#   3. Agregar:
-#        GITHUB_TOKEN    = <tu Personal Access Token con scope Contents: Read & Write>
-#        ADMIN_PASSWORD  = <contraseña del panel de administración>
-#   4. Marcar ambas como "Encrypt" para que no sean visibles en logs.
+# Secretos a configurar manualmente (Production + Preview):
+#   SUPABASE_SERVICE_ROLE_KEY  → service_role JWT de Supabase (Encrypt)
+#   ADMIN_PASSWORD             → contraseña del panel de administración (Encrypt)
 #
-# Variables NO-secretas (valores públicos — seguros de commitear):
+# Variables NO-secretas (seguras de commitear):
 [vars]
-GITHUB_OWNER  = "FRANCOVICHO"
-GITHUB_REPO   = "photoscanopia"
-GITHUB_BRANCH = "main"
+SUPABASE_URL = "https://tu-proyecto.supabase.co"
