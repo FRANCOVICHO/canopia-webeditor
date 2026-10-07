@@ -103,11 +103,22 @@ export async function onRequestPost({ request, env }) {
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
 
-    // Validar que sea un File real
-    if (!(file instanceof File)) {
-      const label = String(file);
-      console.warn(`[upload] Imagen ${i + 1}/${files.length}: tipo de dato inválido (${label})`);
-      failures.push({ filename: label, error: "Tipo de dato inválido. Solo se aceptan archivos." });
+    // Verificar que el objeto tenga las propiedades de un File/Blob.
+    // NO usar instanceof File — en Cloudflare Workers el constructor global
+    // File no siempre coincide con el tipo interno que devuelve formData.getAll(),
+    // por lo que instanceof falla aunque el objeto sea funcionalmente un File.
+    // Duck-typing sobre las propiedades que realmente usamos es lo correcto.
+    const isFilelike = file !== null
+      && typeof file === "object"
+      && typeof file.name     === "string"
+      && typeof file.size     === "number"
+      && typeof file.arrayBuffer === "function";
+
+    if (!isFilelike) {
+      const label  = String(file);
+      const typeOf = typeof file;
+      console.warn(`[upload] Imagen ${i + 1}/${files.length}: no es un archivo — typeof="${typeOf}", valor="${label}"`);
+      failures.push({ filename: label, error: `Se esperaba un archivo pero se recibió: ${typeOf}` });
       continue;
     }
 
