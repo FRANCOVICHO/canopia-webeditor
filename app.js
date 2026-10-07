@@ -268,8 +268,22 @@ function validateImageFile(file) {
 }
 
 // ── Enviar un archivo al backend como JSON (evita el parser multipart de Workers) ──
-// Cloudflare Workers convierte las partes multipart sin filename a string.
-// Enviando JSON + array de bytes el backend recibe los datos sin ambigüedad.
+// ── Convertir ArrayBuffer a base64 sin bloquear el browser ───────────────
+// Procesa en chunks de 32KB para evitar que btoa + string concatenation
+// cause jank en el hilo principal con imágenes grandes.
+function bufferToBase64Browser(buffer) {
+  const bytes   = new Uint8Array(buffer);
+  const CHUNK   = 32768;
+  let   binary  = "";
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
+}
+
+// ── Enviar un archivo al backend como JSON con data en base64 ─────────────
+// Base64 produce ~33% más de datos que el binario original pero es 3x
+// más compacto que Array.from(Uint8Array) que serializa cada byte como número.
 async function uploadFileAsJson(file) {
   const buffer = await file.arrayBuffer();
   const res = await fetch(IMG_UPLOAD_ENDPOINT, {
@@ -283,7 +297,7 @@ async function uploadFileAsJson(file) {
       name: file.name,
       type: resolveFileMime(file),
       size: file.size,
-      data: Array.from(new Uint8Array(buffer)),
+      data: bufferToBase64Browser(buffer),
     }),
   });
   const data = await res.json().catch(() => ({}));

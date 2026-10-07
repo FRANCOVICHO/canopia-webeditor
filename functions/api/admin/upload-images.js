@@ -71,19 +71,33 @@ export async function onRequestPost({ request, env }) {
     );
   }
 
-  const { name: originalName, type: declaredType, size: declaredSize, data: byteArray } = payload;
+  const { name: originalName, type: declaredType, size: declaredSize, data: base64Data } = payload;
 
   // Validar campos obligatorios
-  if (!originalName || !Array.isArray(byteArray) || byteArray.length === 0) {
+  if (!originalName || typeof base64Data !== "string" || base64Data.length === 0) {
     return Response.json(
-      { error: "Faltan campos requeridos: name, data (array de bytes)." },
+      { error: "Faltan campos requeridos: name, data (string base64)." },
       { status: 400 }
     );
   }
 
   const mimeType = resolveFileMime(originalName, declaredType);
-  const sizeKB   = Math.round(byteArray.length / 1024);
 
+  // Decodificar base64 → Uint8Array → ArrayBuffer
+  let buffer;
+  try {
+    const binary = atob(base64Data);
+    const uint8  = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) uint8[i] = binary.charCodeAt(i);
+    buffer = uint8.buffer;
+  } catch {
+    return Response.json(
+      { error: "El campo data no es un base64 válido." },
+      { status: 400 }
+    );
+  }
+
+  const sizeKB = Math.round(buffer.byteLength / 1024);
   console.log(`[upload] name="${originalName}" mime="${mimeType}" ${sizeKB} KB`);
 
   // Validaciones
@@ -94,16 +108,12 @@ export async function onRequestPost({ request, env }) {
     });
   }
 
-  if (byteArray.length > MAX_FILE_SIZE) {
+  if (buffer.byteLength > MAX_FILE_SIZE) {
     return Response.json({
       ok: false, uploaded: 0, failed: 1, urls: [],
       failures: [{ filename: originalName, error: `Supera el límite de ${MAX_FILE_SIZE / 1024 / 1024} MB.` }],
     });
   }
-
-  // Reconstruir ArrayBuffer desde el array de bytes
-  const uint8 = new Uint8Array(byteArray);
-  const buffer = uint8.buffer;
 
   // Subir a Supabase Storage
   const uniqueName = generateFilename(originalName, mimeType);
