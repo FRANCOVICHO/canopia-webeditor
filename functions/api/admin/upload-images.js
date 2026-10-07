@@ -75,7 +75,19 @@ export async function onRequestPost({ request, env }) {
     return Response.json({ error: "No se enviaron archivos. El campo debe llamarse 'files'." }, { status: 400 });
   }
 
-  console.log(`[upload] Recibidas ${files.length} imagen${files.length !== 1 ? "es" : ""}`);
+  // ── LOG DIAGNÓSTICO TEMPORAL ──────────────────────────────────────────
+  console.log("[upload-diag] files.length:", files.length);
+  files.forEach((f, i) => {
+    console.log(`[upload-diag] files[${i}]:`, {
+      typeof:    typeof f,
+      toString:  Object.prototype.toString.call(f),
+      constructor: f?.constructor?.name ?? "null",
+      name:      f?.name,
+      size:      f?.size,
+      type:      f?.type,
+    });
+  });
+  // ─────────────────────────────────────────────────────────────────────
 
   const results  = []; // { url, filename, original }
   const failures = []; // { filename, error }
