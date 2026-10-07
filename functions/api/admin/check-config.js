@@ -43,7 +43,10 @@ export async function onRequestGet({ request, env }) {
     checks.push({
       key:    "SUPABASE_SERVICE_ROLE_KEY",
       status: "missing",
-      message: "No configurada. Agregar como variable Encrypted en Cloudflare Pages.",
+      // Diagnóstico extra: listar las keys del env que SÍ llegan
+      // para detectar errores de nombre (ej: SUPABASE_SERVICE_KEY vs SUPABASE_SERVICE_ROLE_KEY)
+      message: `No configurada. Agregar como variable Encrypted en Cloudflare Pages → Settings → Environment Variables → Production. Nombre exacto requerido: SUPABASE_SERVICE_ROLE_KEY`,
+      hint: `Variables de entorno que sí llegan al Worker: ${Object.keys(env).filter(k => !k.toLowerCase().includes("key") && !k.toLowerCase().includes("token") && !k.toLowerCase().includes("password") && !k.toLowerCase().includes("secret")).join(", ") || "(ninguna no-secreta detectada)"}`,
     });
   } else {
     checks.push({
