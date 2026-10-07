@@ -267,6 +267,32 @@ function validateImageFile(file) {
   return null; // ok
 }
 
+// ── Enviar un archivo al backend como JSON (evita el parser multipart de Workers) ──
+// Cloudflare Workers convierte las partes multipart sin filename a string.
+// Enviando JSON + array de bytes el backend recibe los datos sin ambigüedad.
+async function uploadFileAsJson(file) {
+  const buffer = await file.arrayBuffer();
+  const res = await fetch(IMG_UPLOAD_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type":     "application/json",
+      "x-admin-password": localStorage.getItem(sessionKey) || "",
+      "X-Last-Active":    localStorage.getItem("canopia_last_active") || Date.now().toString(),
+    },
+    body: JSON.stringify({
+      name: file.name,
+      type: resolveFileMime(file),
+      size: file.size,
+      data: Array.from(new Uint8Array(buffer)),
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Error HTTP ${res.status}`);
+  const urls = data.urls || [];
+  if (!urls.length) throw new Error(data.failures?.[0]?.error || "No se obtuvo URL.");
+  return urls[0];
+}
+
 // ── Detectar duplicados por nombre+tamaño ─
 function isDuplicate(file) {
   return formImages.some((img) => img._originalName === file.name && img._originalSize === file.size);
@@ -349,28 +375,11 @@ async function uploadImages(files) {
     }
 
     try {
-      const fd = new FormData();
-      fd.append("files", file, file.name || "imagen.jpg");
-
-      const res  = await fetch(IMG_UPLOAD_ENDPOINT, {
-        method: "POST",
-        headers: {
-          "x-admin-password": localStorage.getItem(sessionKey) || "",
-          "X-Last-Active": localStorage.getItem("canopia_last_active") || Date.now().toString(),
-        },
-        body: fd,
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) throw new Error(data.error || `Error HTTP ${res.status}`);
-
-      const urls = data.urls || [];
-      if (!urls.length) throw new Error(data.failures?.[0]?.error || "No se obtuvo URL.");
+      const url = await uploadFileAsJson(file);
 
       // Actualizar entrada a "done"
       const img = formImages[entryIdx];
-      img.url    = urls[0];
+      img.url    = url;
       img.status = "done";
     } catch (err) {
       const img = formImages[entryIdx];
@@ -415,25 +424,9 @@ async function retryFailedImage(idx) {
   setGalleryUploading(true);
 
   try {
-    const fd = new FormData();
-    fd.append("files", img._file, img._file?.name || "imagen.jpg");
+    const url = await uploadFileAsJson(img._file);
 
-    const res  = await fetch(IMG_UPLOAD_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "x-admin-password": localStorage.getItem(sessionKey) || "",
-        "X-Last-Active": localStorage.getItem("canopia_last_active") || Date.now().toString(),
-      },
-      body: fd,
-    });
-
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || `Error HTTP ${res.status}`);
-
-    const urls = data.urls || [];
-    if (!urls.length) throw new Error(data.failures?.[0]?.error || "No se obtuvo URL.");
-
-    img.url    = urls[0];
+    img.url    = url;
     img.status = "done";
     img.error  = null;
     showImgStatus("✓ Imagen resubida correctamente", "success");
@@ -478,25 +471,9 @@ function triggerReplaceFile(idx) {
     setGalleryUploading(true);
 
     try {
-      const fd = new FormData();
-      fd.append("files", file, file.name || "imagen.jpg");
+      const url = await uploadFileAsJson(file);
 
-      const res  = await fetch(IMG_UPLOAD_ENDPOINT, {
-        method: "POST",
-        headers: {
-          "x-admin-password": localStorage.getItem(sessionKey) || "",
-          "X-Last-Active": localStorage.getItem("canopia_last_active") || Date.now().toString(),
-        },
-        body: fd,
-      });
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `Error HTTP ${res.status}`);
-
-      const urls = data.urls || [];
-      if (!urls.length) throw new Error(data.failures?.[0]?.error || "No se obtuvo URL.");
-
-      formImages[idx].url    = urls[0];
+      formImages[idx].url    = url;
       formImages[idx].status = "done";
       showImgStatus("✓ Imagen reemplazada correctamente", "success");
     } catch (err) {

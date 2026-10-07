@@ -1,13 +1,16 @@
 /**
  * POST /api/admin/upload-images
  *
- * Recibe uno o varios archivos (multipart/form-data, campo "files"),
- * los valida y los sube al bucket "product-images" de Supabase Storage.
- * Devuelve las URLs públicas al frontend.
+ * Recibe UN archivo por request como JSON:
+ *   { name: string, type: string, size: number, data: number[] }
  *
- * Variables de entorno requeridas (Cloudflare Pages → Settings → Variables):
- *   SUPABASE_URL              → ej: https://xyzxyz.supabase.co
- *   SUPABASE_SERVICE_ROLE_KEY → service_role JWT (marcar como Encrypted)
+ * El campo "data" es un Array.from(new Uint8Array(buffer)) serializado.
+ * Este enfoque evita el parser multipart de Cloudflare Workers, que
+ * convierte partes sin filename a string en lugar de File.
+ *
+ * Variables de entorno requeridas:
+ *   SUPABASE_URL              → https://<project>.supabase.co
+ *   SUPABASE_SERVICE_ROLE_KEY → service_role JWT (Encrypted)
  *
  * La service role key NUNCA llega al frontend.
  */
@@ -20,22 +23,21 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 const BUCKET        = "product-images";
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
 
-// ── Inferir MIME por extensión cuando file.type llega vacío ────────────────
-// Safari iOS y drag desde Windows Explorer no siempre populan file.type.
+// ── Inferir MIME por extensión cuando type llega vacío ─────────────────────
 function mimeFromFilename(filename) {
   const ext = String(filename || "").split(".").pop().toLowerCase();
   const map  = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp" };
   return map[ext] || "";
 }
 
-function resolveFileMime(file) {
-  return (file.type || "").toLowerCase() || mimeFromFilename(file.name);
+function resolveFileMime(name, type) {
+  return (type || "").toLowerCase() || mimeFromFilename(name);
 }
 
-// ── Generar nombre único para evitar colisiones ────────────────────────────
+// ── Generar nombre único ───────────────────────────────────────────────────
 function generateFilename(originalName, mime) {
   const extMap = { "image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png", "image/webp": "webp" };
-  const ext    = extMap[mime] || originalName.split(".").pop().toLowerCase() || "jpg";
+  const ext    = extMap[mime] || String(originalName).split(".").pop().toLowerCase() || "jpg";
   const now    = new Date();
   const date   = now.toISOString().slice(0, 10).replace(/-/g, "");
   const time   = now.toISOString().slice(11, 19).replace(/:/g, "");
@@ -53,142 +55,101 @@ export async function onRequestPost({ request, env }) {
 
   if (!SUPABASE_URL || !SUPABASE_KEY) {
     return Response.json(
-      { error: "SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY no configurados en Cloudflare Pages → Settings → Environment Variables." },
+      { error: "SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY no configurados." },
       { status: 500 }
     );
   }
 
-  // Parsear multipart/form-data
-  let formData;
+  // Parsear JSON
+  let payload;
   try {
-    formData = await request.formData();
+    payload = await request.json();
   } catch (err) {
-    console.error("[upload] Error parseando FormData:", err.message);
     return Response.json(
-      { error: "No se pudo leer el formulario. Verificá que el Content-Type sea multipart/form-data." },
+      { error: "No se pudo parsear el JSON del request." },
       { status: 400 }
     );
   }
 
-  const files = formData.getAll("files");
-  if (!files || files.length === 0) {
-    return Response.json({ error: "No se enviaron archivos. El campo debe llamarse 'files'." }, { status: 400 });
-  }
+  const { name: originalName, type: declaredType, size: declaredSize, data: byteArray } = payload;
 
-  // ── LOG DIAGNÓSTICO TEMPORAL ──────────────────────────────────────────
-  console.log("[upload-diag] files.length:", files.length);
-  files.forEach((f, i) => {
-    console.log(`[upload-diag] files[${i}]:`, {
-      typeof:    typeof f,
-      toString:  Object.prototype.toString.call(f),
-      constructor: f?.constructor?.name ?? "null",
-      name:      f?.name,
-      size:      f?.size,
-      type:      f?.type,
-    });
-  });
-  // ─────────────────────────────────────────────────────────────────────
-
-  const results  = []; // { url, filename, original }
-  const failures = []; // { filename, error }
-
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-
-    // Duck-typing — instanceof File falla en Cloudflare Workers runtime
-    const isFilelike =
-      file !== null &&
-      typeof file === "object" &&
-      typeof file.name        === "string" &&
-      typeof file.size        === "number" &&
-      typeof file.arrayBuffer === "function";
-
-    if (!isFilelike) {
-      console.warn(`[upload] Imagen ${i + 1}: no es un archivo — typeof="${typeof file}"`);
-      failures.push({ filename: String(file), error: "Se esperaba un archivo." });
-      continue;
-    }
-
-    const originalName = file.name || `imagen-${i + 1}`;
-    const mimeType     = resolveFileMime(file);
-    const sizeKB       = Math.round(file.size / 1024);
-
-    console.log(`[upload] ${i + 1}/${files.length}: name="${originalName}" mime="${mimeType}" ${sizeKB} KB`);
-
-    // ── Validaciones ──────────────────────────────────────────────────────
-    if (!ALLOWED_TYPES.has(mimeType)) {
-      failures.push({ filename: originalName, error: `Formato no permitido: ${mimeType || originalName.split(".").pop()}. Solo JPG, PNG o WEBP.` });
-      continue;
-    }
-    if (file.size > MAX_FILE_SIZE) {
-      failures.push({ filename: originalName, error: `Supera el límite de ${MAX_FILE_SIZE / 1024 / 1024} MB.` });
-      continue;
-    }
-    if (file.size === 0) {
-      failures.push({ filename: originalName, error: "El archivo está vacío." });
-      continue;
-    }
-
-    // ── Leer bytes ────────────────────────────────────────────────────────
-    let arrayBuffer;
-    try {
-      arrayBuffer = await file.arrayBuffer();
-    } catch (err) {
-      failures.push({ filename: originalName, error: `No se pudo leer el archivo: ${err.message}` });
-      continue;
-    }
-
-    // ── Subir a Supabase Storage ──────────────────────────────────────────
-    const uniqueName = generateFilename(originalName, mimeType);
-
-    try {
-      const url = await uploadToSupabase({
-        buffer:      arrayBuffer,
-        filename:    uniqueName,
-        mimeType,
-        supabaseUrl: SUPABASE_URL,
-        serviceKey:  SUPABASE_KEY,
-        bucket:      BUCKET,
-      });
-      console.log(`[upload] "${originalName}" → ${url}`);
-      results.push({ url, filename: uniqueName, original: originalName, ok: true });
-    } catch (err) {
-      console.error(`[upload] "${originalName}": error —`, err.message);
-      failures.push({ filename: originalName, error: err.message });
-    }
-  }
-
-  // Audit log — no bloquea si D1 falla
-  try {
-    await logAuditEvent(
-      env, request, "UPLOAD_IMAGES",
-      `supabase:${BUCKET}`,
-      null,
-      { uploaded: results.length, failed: failures.length, files: results.map((r) => r.filename) }
+  // Validar campos obligatorios
+  if (!originalName || !Array.isArray(byteArray) || byteArray.length === 0) {
+    return Response.json(
+      { error: "Faltan campos requeridos: name, data (array de bytes)." },
+      { status: 400 }
     );
-  } catch (logErr) {
-    console.warn("[upload] Audit log falló:", logErr.message);
   }
 
-  console.log(`[upload] Finalizado: ${results.length} subidas, ${failures.length} errores`);
+  const mimeType = resolveFileMime(originalName, declaredType);
+  const sizeKB   = Math.round(byteArray.length / 1024);
+
+  console.log(`[upload] name="${originalName}" mime="${mimeType}" ${sizeKB} KB`);
+
+  // Validaciones
+  if (!ALLOWED_TYPES.has(mimeType)) {
+    return Response.json({
+      ok: false, uploaded: 0, failed: 1, urls: [],
+      failures: [{ filename: originalName, error: `Formato no permitido: ${mimeType || originalName.split(".").pop()}. Solo JPG, PNG o WEBP.` }],
+    });
+  }
+
+  if (byteArray.length > MAX_FILE_SIZE) {
+    return Response.json({
+      ok: false, uploaded: 0, failed: 1, urls: [],
+      failures: [{ filename: originalName, error: `Supera el límite de ${MAX_FILE_SIZE / 1024 / 1024} MB.` }],
+    });
+  }
+
+  // Reconstruir ArrayBuffer desde el array de bytes
+  const uint8 = new Uint8Array(byteArray);
+  const buffer = uint8.buffer;
+
+  // Subir a Supabase Storage
+  const uniqueName = generateFilename(originalName, mimeType);
+
+  let url;
+  try {
+    url = await uploadToSupabase({
+      buffer,
+      filename:    uniqueName,
+      mimeType,
+      supabaseUrl: SUPABASE_URL,
+      serviceKey:  SUPABASE_KEY,
+      bucket:      BUCKET,
+    });
+    console.log(`[upload] "${originalName}" → ${url}`);
+  } catch (err) {
+    console.error(`[upload] "${originalName}": error —`, err.message);
+
+    try {
+      await logAuditEvent(env, request, "UPLOAD_IMAGE_FAILED", `supabase:${BUCKET}`, null,
+        { filename: originalName, error: err.message });
+    } catch { /* silencioso */ }
+
+    return Response.json({
+      ok: false, uploaded: 0, failed: 1, urls: [],
+      failures: [{ filename: originalName, error: err.message }],
+    });
+  }
+
+  // Audit log
+  try {
+    await logAuditEvent(env, request, "UPLOAD_IMAGE", `supabase:${BUCKET}`, null,
+      { filename: uniqueName, original: originalName });
+  } catch { /* silencioso */ }
 
   return Response.json({
-    ok:       results.length > 0,
-    uploaded: results.length,
-    failed:   failures.length,
-    urls:     results.map((r) => r.url),
-    results,
-    failures,
+    ok:       true,
+    uploaded: 1,
+    failed:   0,
+    urls:     [url],
+    results:  [{ url, filename: uniqueName, original: originalName, ok: true }],
+    failures: [],
   });
 }
 
-// ── Subir un archivo a Supabase Storage ───────────────────────────────────
-// Usa la REST API de Storage directamente (sin SDK) para no añadir
-// dependencias externas incompatibles con el runtime de Cloudflare Workers.
-//
-// Endpoint: PUT /storage/v1/object/{bucket}/{filename}
-// Auth: Authorization: Bearer <service_role_key>
-// Docs: https://supabase.com/docs/reference/javascript/storage-from-upload
+// ── Subir a Supabase Storage vía REST ─────────────────────────────────────
 async function uploadToSupabase({ buffer, filename, mimeType, supabaseUrl, serviceKey, bucket }) {
   const endpoint = `${supabaseUrl}/storage/v1/object/${bucket}/${filename}`;
 
@@ -208,17 +169,16 @@ async function uploadToSupabase({ buffer, filename, mimeType, supabaseUrl, servi
     const msg  = body.error || body.message || `HTTP ${response.status}`;
 
     if (response.status === 401 || response.status === 403) {
-      throw new Error("SUPABASE_SERVICE_ROLE_KEY inválida o sin permisos en el bucket product-images.");
+      throw new Error("SUPABASE_SERVICE_ROLE_KEY inválida o sin permisos en el bucket.");
     }
     if (response.status === 404) {
       throw new Error(`Bucket "${bucket}" no encontrado. Crealo en Supabase Dashboard → Storage.`);
     }
     if (response.status === 409) {
-      throw new Error(`Conflicto: el archivo "${filename}" ya existe. Esto no debería ocurrir con nombres únicos.`);
+      throw new Error(`El archivo "${filename}" ya existe. Esto no debería ocurrir con nombres únicos.`);
     }
     throw new Error(`Supabase Storage respondió ${response.status}: ${msg}`);
   }
 
-  // URL pública del bucket (el bucket debe estar configurado como público)
   return `${supabaseUrl}/storage/v1/object/public/${bucket}/${filename}`;
 }
