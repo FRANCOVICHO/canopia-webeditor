@@ -1187,11 +1187,28 @@ function buildPageList(cur, total) {
   return list;
 }
 
+// ── Convertir nombre a slug URL-safe ──────────────────────────────────────
+function slugify(text) {
+  return String(text)
+    .toLowerCase()
+    .normalize("NFD")                         // descomponer acentos: á → a + ́
+    .replace(/[\u0300-\u036f]/g, "")          // eliminar diacríticos
+    .replace(/[^a-z0-9\s-]/g, "")            // solo letras, números, espacios, guiones
+    .trim()
+    .replace(/\s+/g, "-")                     // espacios → guion
+    .replace(/-{2,}/g, "-")                   // guiones dobles → uno
+    .slice(0, 80);                            // máximo 80 chars
+}
+
 // ════════════════════════════════════════
 //  PRODUCT FORM
 // ════════════════════════════════════════
 function fillForm(product = {}) {
-  const form = document.querySelector("#product-form");
+  const form    = document.querySelector("#product-form");
+  const idInput = document.querySelector("#product-id-input");
+  const idHint  = document.querySelector("#product-id-hint");
+  const isNew   = !product.id;
+
   form.id.value          = product.id          || "";
   form.name.value        = product.name        || "";
   form.category.value    = product.category    || "";  // also sets #cat-input
@@ -1201,6 +1218,39 @@ function fillForm(product = {}) {
   form.description.value = product.description || "";
   form.featured.checked  = Boolean(product.featured);
   form.visible.checked   = product.visible !== false;
+
+  // ID: editable en productos nuevos, bloqueado en existentes
+  if (idInput) {
+    idInput.readOnly = !isNew;
+    idInput.style.opacity = isNew ? "" : "0.55";
+    idInput.title = isNew ? "" : "El ID no se puede cambiar una vez creado el producto.";
+  }
+  if (idHint) {
+    idHint.textContent = isNew ? "Se genera automáticamente desde el nombre." : `ID fijo: ${product.id}`;
+    idHint.className   = isNew ? "field-hint" : "field-hint field-hint--locked";
+  }
+
+  // Listener: auto-generar slug desde el nombre solo en productos nuevos
+  const nameInput = form.querySelector("[name=name]");
+  if (nameInput) {
+    // Remover listener previo clonando el nodo
+    const fresh = nameInput.cloneNode(true);
+    nameInput.parentNode.replaceChild(fresh, nameInput);
+    if (isNew) {
+      fresh.addEventListener("input", () => {
+        if (idInput && !idInput._manuallyEdited) {
+          idInput.value = slugify(fresh.value);
+        }
+      });
+    }
+    fresh.focus();
+  }
+
+  // Listener: si el admin edita el slug manualmente, dejar de auto-generarlo
+  if (idInput && isNew) {
+    idInput._manuallyEdited = false;
+    idInput.addEventListener("input", () => { idInput._manuallyEdited = true; }, { once: true });
+  }
 
   // images — convertir URLs planas al nuevo formato de objeto
   const rawUrls = parseImages(product.image);
@@ -1214,7 +1264,7 @@ function fillForm(product = {}) {
   syncImgHidden();
   renderImgPreviews();
 
-  form.name.focus();
+  // focus ya se aplica en el bloque del nameInput (fresh.focus() arriba)
   document.querySelector(".edit-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
