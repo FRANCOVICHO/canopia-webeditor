@@ -1,4 +1,5 @@
 import { assertAdmin } from "./_auth.js";
+import { changePendingOrder } from "../../_lib/order-integrity.js";
 import { logAuditEvent } from "./_log.js";
 
 // GET /api/admin/orders?status=pendiente   → filtra por estado
@@ -32,7 +33,7 @@ export async function onRequestPost({ request, env }) {
   const body   = await request.json().catch(() => null);
   const id     = Number(body?.id);
 
-  if (!id || !["confirm", "reject"].includes(action)) {
+  if (!Number.isSafeInteger(id) || id < 1 || !["confirm", "reject"].includes(action)) {
     return Response.json({ error: "Accion o ID invalido." }, { status: 400 });
   }
 
@@ -47,29 +48,9 @@ export async function onRequestPost({ request, env }) {
     return Response.json({ error: `El pedido ya fue ${order.status}.` }, { status: 409 });
   }
 
-  let finalStatus = "";
-
-  if (action === "reject") {
-    await env.canopia_db
-      .prepare("UPDATE orders SET status = 'rechazado' WHERE id = ?")
-      .bind(id)
-      .run();
-    finalStatus = "rechazado";
-  } else if (action === "confirm") {
-    const items = JSON.parse(order.items_json || "[]");
-    const statements = items.map((item) =>
-      env.canopia_db
-        .prepare("UPDATE products SET stock = stock - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND stock >= ?")
-        .bind(item.quantity, item.id, item.quantity)
-    );
-    statements.push(
-      env.canopia_db
-        .prepare("UPDATE orders SET status = 'confirmado' WHERE id = ?")
-        .bind(id)
-    );
-
-    await env.canopia_db.batch(statements);
-    finalStatus = "confirmado";
+  const finalStatus = action === "confirm" ? "confirmado" : "rechazado";
+  if (!await changePendingOrder(env.canopia_db, order, finalStatus)) {
+    return Response.json({ error: "El pedido cambió de estado o ya no hay stock suficiente." }, { status: 409 });
   }
 
   const newRecord = await env.canopia_db.prepare("SELECT * FROM orders WHERE id = ?").bind(id).first();

@@ -15,7 +15,7 @@ const sectionMeta = {
   products:   { title: "Editar catálogo",          sub: "Gestioná tus productos, precios, stock y más.", crumb: "Productos",      actions: true  },
   categories: { title: "Categorías",               sub: "Creá y administrá las categorías.",             crumb: "Categorías",     actions: false },
   orders:     { title: "Pedidos",                  sub: "Últimos pedidos confirmados desde la web.",     crumb: "Pedidos",        actions: false },
-  recovery:   { title: "Códigos de recuperación",  sub: "Códigos de acceso pendientes de envío.",        crumb: "Recuperación",   actions: false },
+  recovery:   { title: "Recuperación de cuentas",  sub: "Restablecimiento por correo electrónico.",        crumb: "Recuperación",   actions: false },
   clients:    { title: "Clientes",                 sub: "Clientes que realizaron pedidos.",              crumb: "Clientes",       actions: false },
   inventory:  { title: "Inventario",               sub: "Stock actual de todos los productos.",          crumb: "Inventario",     actions: false },
   promos:     { title: "Promociones",              sub: "Gestión de promociones y descuentos.",          crumb: "Promociones",    actions: false },
@@ -769,7 +769,7 @@ function showAdmin() {
   setupCatPicker();
   checkStorageConfig();     // verificar configuración de Supabase al iniciar
   loadAll();
-  refreshRecoveryBadge();
+
   setTimeout(loadNotifications, 1500); // cargar notifs después de que carguen los productos
 }
 
@@ -1349,77 +1349,9 @@ function resetCatForm() {
 // ════════════════════════════════════════
 //  RECOVERY CODES
 // ════════════════════════════════════════
-const RECOVERY_API = "https://canopiagrow.com/api/auth?action=recovery-codes";
-
-async function loadRecoveryCodes() {
+function loadRecoveryCodes() {
   const container = document.querySelector("#recovery-list");
-  if (!container) return;
-  container.innerHTML = `<p class="muted-text" style="padding:8px 0">Cargando…</p>`;
-
-  try {
-    const res = await fetch(RECOVERY_API, {
-      headers: { "x-admin-password": localStorage.getItem(sessionKey) || "" },
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || "No se pudo cargar.");
-
-    const codes = data.codes || [];
-    updateRecoveryBadge(codes.length);
-
-    if (!codes.length) {
-      container.innerHTML = `<p class="muted-text" style="padding:8px 0">No hay códigos pendientes.</p>`;
-      return;
-    }
-
-    container.innerHTML = codes.map((c) => {
-      const minsLeft = Math.max(0, Math.round((new Date(c.expires) - Date.now()) / 60000));
-      const phone    = (c.phone || "").replace(/\D/g, "");
-      const msg      = encodeURIComponent(`Hola ${c.name}, tu código de recuperación de Canopia es: ${c.code} (válido ${minsLeft} min)`);
-      const expired  = minsLeft === 0;
-
-      return `
-        <div class="recovery-card ${expired ? "recovery-card--expired" : ""}">
-          <div class="recovery-top">
-            <span class="recovery-code">${escapeHtml(c.code)}</span>
-            <span class="recovery-timer ${expired ? "recovery-timer--expired" : ""}">
-              ${expired ? "⚠ Expirado" : `⏱ ${minsLeft} min restantes`}
-            </span>
-          </div>
-          <p class="recovery-user">
-            <strong>${escapeHtml(c.name)}</strong>
-            ${c.email ? `· ${escapeHtml(c.email)}` : ""}
-            ${phone   ? `· ${escapeHtml(c.phone)}` : ""}
-          </p>
-          ${phone && !expired ? `
-            <a class="btn-whatsapp"
-               href="https://wa.me/${phone}?text=${msg}"
-               target="_blank" rel="noopener">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.553 4.116 1.52 5.847L0 24l6.335-1.502A11.954 11.954 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 0 1-5.006-1.368l-.36-.214-3.76.892.948-3.653-.234-.374A9.818 9.818 0 1 1 12 21.818z"/></svg>
-              Enviar por WhatsApp
-            </a>` : ""}
-        </div>`;
-    }).join("");
-
-  } catch (err) {
-    container.innerHTML = `<p class="muted-text" style="padding:8px 0;color:var(--red)">${escapeHtml(err.message)}</p>`;
-  }
-}
-
-function updateRecoveryBadge(count) {
-  const badge = document.querySelector("#recovery-badge");
-  if (!badge) return;
-  badge.textContent = count > 0 ? count : "";
-  badge.hidden      = count === 0;
-}
-
-async function refreshRecoveryBadge() {
-  try {
-    const res  = await fetch(RECOVERY_API, {
-      headers: { "x-admin-password": localStorage.getItem(sessionKey) || "" },
-    });
-    const data = await res.json().catch(() => ({}));
-    updateRecoveryBadge((data.codes || []).length);
-  } catch { /* silently ignore */ }
+  if (container) container.textContent = "La recuperación de cuentas se realiza por correo electrónico.";
 }
 
 // ════════════════════════════════════════
@@ -1713,7 +1645,7 @@ async function loadNotifications() {
         type: "warning",
         icon: "📋",
         title: `${pending.length} pedido${pending.length>1?"s":""} pendiente${pending.length>1?"s":""}`,
-        body: pending.map(o=>`#${o.id} — ${o.customer_name} — ${money.format(o.total)}`).join("<br>"),
+        body: pending.map(o=>`#${o.id} — ${escapeHtml(o.customer_name)} — ${money.format(o.total)}`).join("<br>"),
         action: "orders",
         actionLabel: "Ver pedidos",
       });
@@ -1742,23 +1674,6 @@ async function loadNotifications() {
         actionLabel: "Ver inventario",
       });
     }
-
-    // 3. Códigos de recuperación activos
-    try {
-      const recRes  = await fetch(RECOVERY_API, { headers: { "x-admin-password": localStorage.getItem(sessionKey)||"" } });
-      const recData = await recRes.json().catch(()=>({}));
-      const codes   = (recData.codes||[]);
-      if (codes.length > 0) {
-        notifs.push({
-          type: "info",
-          icon: "🔑",
-          title: `${codes.length} código${codes.length>1?"s":""} de recuperación activo${codes.length>1?"s":""}`,
-          body: codes.map(c=>`${escapeHtml(c.name||"")} — ${Math.max(0,Math.round((new Date(c.expires)-Date.now())/60000))} min restantes`).join("<br>"),
-          action: "recovery",
-          actionLabel: "Ver códigos",
-        });
-      }
-    } catch {}
 
     // 4. Groq analiza las notificaciones y agrega insights
     if (notifs.length > 0 || products.length > 0) {
@@ -2053,6 +1968,6 @@ document.querySelectorAll(".nav-item").forEach((item) => {
 setInterval(() => {
   if (localStorage.getItem(sessionKey)) {
     updateOrdersBadge();
-    refreshRecoveryBadge();
+
   }
 }, 15000);
