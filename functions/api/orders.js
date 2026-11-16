@@ -1,3 +1,5 @@
+import { cartItems } from "../_lib/order-integrity.js";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
@@ -18,16 +20,13 @@ export async function onRequestPost({ request, env }) {
   const customerPhone = String(payload.customer?.phone || "").trim();
   const customerNote  = String(payload.customer?.note  || "").trim();
 
-  if (!customerName || !customerPhone) {
+  if (!customerName || customerName.length > 120 || !customerPhone || customerPhone.length > 40 || customerNote.length > 1000) {
     return Response.json({ error: "Falta nombre o telefono." }, { status: 400, headers: corsHeaders });
   }
 
-  const items = payload.items
-    .map((item) => ({ id: String(item.id || "").trim(), quantity: Math.max(1, Number(item.quantity || 1)) }))
-    .filter((item) => item.id);
-
-  if (!items.length) {
-    return Response.json({ error: "El carrito esta vacio." }, { status: 400, headers: corsHeaders });
+  const items = cartItems(payload.items);
+  if (!items) {
+    return Response.json({ error: "El carrito contiene cantidades o productos inválidos." }, { status: 400, headers: corsHeaders });
   }
 
   // Verify products exist and have enough stock — but DON'T discount yet

@@ -116,12 +116,24 @@ export async function onRequestPost({ request, env }) {
     return Response.json({ error: `Producto "${productId}" no encontrado.` }, { status: 404 });
   }
 
+  let origin;
+  try {
+    const source = new URL(oldUrl);
+    if (source.protocol === "https:" && !source.username && !source.password) origin = source.origin;
+  } catch { /* URL inválida */ }
+  const allowed = new Set(["https://pb.canopiagrow.com",
+    ...(env.LEGACY_IMAGE_ORIGINS || "").split(",").map((entry) => entry.trim()).filter(Boolean)]);
+  if (!origin || !allowed.has(origin) || !parseImages(product.image).includes(oldUrl)) {
+    return Response.json({ error: "El origen de la imagen no está autorizado." }, { status: 400 });
+  }
+
   // Descargar la imagen desde la URL legacy
   let imageBuffer;
   let mimeType;
   try {
     const fetchRes = await fetch(oldUrl, {
       headers: { "User-Agent": "canopia-webeditor/1.0 (image migration)" },
+      redirect: "error",
       signal: AbortSignal.timeout(15000), // 15s timeout
     });
 
@@ -133,7 +145,31 @@ export async function onRequestPost({ request, env }) {
     }
 
     mimeType    = (fetchRes.headers.get("Content-Type") || "image/jpeg").split(";")[0].trim().toLowerCase();
-    imageBuffer = await fetchRes.arrayBuffer();
+    if (!["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"].includes(mimeType) || !fetchRes.body) {
+      return Response.json({ error: "Formato de imagen no permitido." }, { status: 422 });
+    }
+    // Limit streamed bodies too, including servers that omit Content-Length.
+    const reader = fetchRes.body.getReader();
+    const chunks = [];
+    let size = 0;
+    const limit = 8 * 1024 * 1024;
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > limit) {
+        await reader.cancel();
+        return Response.json({ error: "La imagen supera los 8 MB." }, { status: 413 });
+      }
+      chunks.push(value);
+    }
+    const bytes = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    imageBuffer = bytes.buffer;
 
     if (imageBuffer.byteLength === 0) {
       return Response.json({ error: "La imagen descargada está vacía." }, { status: 422 });
