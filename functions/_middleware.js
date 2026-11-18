@@ -61,7 +61,7 @@ export async function onRequest(context) {
   } catch (err) {
     console.error("[middleware] Excepción no capturada:", err.message);
     return new Response(
-      JSON.stringify({ error: err.message, traceId }),
+      JSON.stringify({ error: "Error interno.", traceId }),
       { status: 500, headers: { ...securityHeaders, "Content-Type": "application/json" } }
     );
   }
@@ -70,6 +70,9 @@ export async function onRequest(context) {
   // new Response(body, response) preserva status + statusText + todos los
   // headers originales del handler (Content-Type, etc.) sin tocarlos.
   const newResponse = new Response(response.body, response);
+  if (new URL(request.url).pathname.startsWith("/api/admin/")) {
+    newResponse.headers.set("Cache-Control", "no-store");
+  }
   for (const [key, value] of Object.entries(securityHeaders)) {
     newResponse.headers.set(key, value);
   }

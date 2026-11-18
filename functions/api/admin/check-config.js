@@ -108,7 +108,7 @@ export async function onRequestGet({ request, env }) {
     status:  env.ADMIN_PASSWORD ? "ok" : "warning",
     message: env.ADMIN_PASSWORD
       ? "Configurada como variable de entorno."
-      : "Usando contraseña hardcodeada. Recomendado: configurarla como variable Encrypted.",
+      : "Configurá ADMIN_PASSWORD como secreto cifrado en Cloudflare.",
   });
 
   // ── Resultado global ───────────────────────────────────────────────────
