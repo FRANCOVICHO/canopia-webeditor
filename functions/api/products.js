@@ -1,3 +1,4 @@
+import { requiresLegalReview } from '../_lib/catalog-policy.js';
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
@@ -58,7 +59,7 @@ export async function onRequestGet({ env }) {
 
   return Response.json(
     {
-      products:  results.map(mapProduct),
+      products:  results.filter(product => !requiresLegalReview(product)).map(mapProduct),
       updatedAt: await getCatalogMeta(env),
     },
     {

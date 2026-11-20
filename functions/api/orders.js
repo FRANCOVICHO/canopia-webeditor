@@ -1,4 +1,5 @@
 import { cartItems } from "../_lib/order-integrity.js";
+import { requiresLegalReview } from "../_lib/catalog-policy.js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -33,7 +34,7 @@ export async function onRequestPost({ request, env }) {
   const ids          = items.map((i) => i.id);
   const placeholders = ids.map(() => "?").join(",");
   const { results: dbProducts } = await env.canopia_db
-    .prepare(`SELECT id, name, price, stock FROM products WHERE id IN (${placeholders}) AND visible = 1`)
+    .prepare(`SELECT id, name, category, tag, price, stock FROM products WHERE id IN (${placeholders}) AND visible = 1`)
     .bind(...ids)
     .all();
 
@@ -46,6 +47,7 @@ export async function onRequestPost({ request, env }) {
     if (!product) {
       return Response.json({ error: `Producto no disponible: ${item.id}` }, { status: 400, headers: corsHeaders });
     }
+    if (requiresLegalReview(product)) return Response.json({error:"Producto pendiente de revisión legal; no habilitado para venta online."},{status:403,headers:corsHeaders});
     if (product.stock < item.quantity) {
       return Response.json(
         { error: `Stock insuficiente para ${product.name}. Disponible: ${product.stock}` },

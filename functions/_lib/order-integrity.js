@@ -1,3 +1,4 @@
+import { requiresLegalReview } from './catalog-policy.js';
 const maxLines = 40;
 const maxQuantity = 999;
 
@@ -40,6 +41,8 @@ export async function changePendingOrder(db, order, status) {
     assertChanged(),
   ];
   for (const { id: productId, quantity } of items) {
+    const product = await db.prepare('SELECT name, category, tag FROM products WHERE id = ?').bind(productId).first();
+    if (!product || requiresLegalReview(product)) return false;
     statements.push(
       db.prepare("UPDATE products SET stock = stock - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND stock >= ?")
         .bind(quantity, productId, quantity),
