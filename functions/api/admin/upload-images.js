@@ -115,6 +115,13 @@ export async function onRequestPost({ request, env }) {
     });
   }
 
+  // Trust file signatures, never just a client-controlled MIME type or extension.
+  const bytes = new Uint8Array(buffer);
+  const matches = mimeType === 'image/png' ? [137,80,78,71,13,10,26,10].every((b,i)=>bytes[i]===b)
+    : mimeType === 'image/webp' ? String.fromCharCode(...bytes.slice(0,4))==='RIFF' && String.fromCharCode(...bytes.slice(8,12))==='WEBP'
+    : bytes[0]===255 && bytes[1]===216 && bytes[2]===255;
+  if (!matches) return Response.json({error:'El contenido no corresponde a una imagen permitida.'},{status:415});
+
   // Subir a Supabase Storage
   const uniqueName = generateFilename(originalName, mimeType);
 

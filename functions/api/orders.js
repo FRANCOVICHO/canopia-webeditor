@@ -12,6 +12,7 @@ export async function onRequestOptions() {
 }
 
 export async function onRequestPost({ request, env }) {
+  if(new URL(request.url).searchParams.has("action")) return Response.json({error:"Accion invalida."},{status:400});
   const payload = await request.json().catch(() => null);
   if (!payload?.items?.length) {
     return Response.json({ error: "El carrito esta vacio." }, { status: 400, headers: corsHeaders });

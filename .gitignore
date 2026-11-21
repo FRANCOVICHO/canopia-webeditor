@@ -1,1 +1,10 @@
 .wrangler
+
+.env
+.env.*
+.dev.vars
+.dev.vars.*
+*.pem
+*.key
+debug.log
+.review-build/

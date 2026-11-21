@@ -1,3 +1,4 @@
+localStorage["removeItem"]("canopia_admin_password");
 const sessionKey = "canopia_admin_password";
 const CATS_KEY   = "canopia_categories";
 const money = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 });
@@ -290,7 +291,7 @@ async function uploadFileAsJson(file) {
     method: "POST",
     headers: {
       "Content-Type":     "application/json",
-      "x-admin-password": localStorage.getItem(sessionKey) || "",
+      "x-admin-password": sessionStorage.getItem(sessionKey) || "",
       "X-Last-Active":    localStorage.getItem("canopia_last_active") || Date.now().toString(),
     },
     body: JSON.stringify({
@@ -739,7 +740,7 @@ document.addEventListener("scroll", updateLastActive, { passive: true });
 
 const authHeaders = () => ({
   "Content-Type": "application/json",
-  "x-admin-password": localStorage.getItem(sessionKey) || "",
+  "x-admin-password": sessionStorage.getItem(sessionKey) || "",
   "X-Last-Active": localStorage.getItem("canopia_last_active") || Date.now().toString(),
 });
 
@@ -749,13 +750,13 @@ async function api(path, options = {}) {
     headers: { ...authHeaders(), ...(options.headers || {}) },
   });
   const data = await response.json().catch(() => ({}));
-  
+
   if (response.status === 401 && data.error === "Sesión expirada por inactividad.") {
-    localStorage.removeItem(sessionKey);
+    sessionStorage.removeItem(sessionKey);
     alert("Tu sesión expiró por inactividad. Ingresá de nuevo.");
     location.reload();
   }
-  
+
   if (!response.ok) throw new Error(data.error || "No se pudo completar la accion.");
   return data;
 }
@@ -1370,7 +1371,7 @@ async function loadReports() {
   try {
     // Fetch analytics + orders en paralelo
     const [analyticsRes, ordersRes] = await Promise.all([
-      fetch(ANALYTICS, { headers: { "x-admin-password": localStorage.getItem(sessionKey) || "" } }).catch(() => ({ json: () => ({ analytics: [] }) })),
+      fetch(ANALYTICS, { headers: { "x-admin-password": sessionStorage.getItem(sessionKey) || "" } }).catch(() => ({ json: () => ({ analytics: [] }) })),
       api("/api/admin/orders"),
     ]);
 
@@ -1605,7 +1606,7 @@ Sé directo, usá los números reales.`;
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error de Groq");
 
-    const text = data.text || "Sin respuesta.";
+    const text = escapeHtml(data.text || "Sin respuesta.");
     output.innerHTML = text
       .split("\n")
       .map(line => {
@@ -1690,8 +1691,8 @@ async function loadNotifications() {
           method: "POST",
           headers: { ...authHeaders() },
           body: JSON.stringify({
-            prompt: `Sos el asistente de Canopia, una tienda grow. Basado en estos datos: ${summary}. 
-              Generá EXACTAMENTE 2-3 alertas o consejos urgentes y concretos en español, en formato de lista corta. 
+            prompt: `Sos el asistente de Canopia, una tienda grow. Basado en estos datos: ${summary}.
+              Generá EXACTAMENTE 2-3 alertas o consejos urgentes y concretos en español, en formato de lista corta.
               Solo el texto, sin títulos, sin markdown, sin emojis. Máximo 3 líneas.`,
             type: "notif",
           }),
@@ -1914,13 +1915,13 @@ document.querySelector("#login-form").addEventListener("submit", async (event) =
   event.preventDefault();
   const password = document.querySelector("#password").value;
   const message  = document.querySelector("#login-message");
-  localStorage.setItem(sessionKey, password);
+  sessionStorage.setItem(sessionKey, password);
   message.textContent = "Verificando…";
   try {
     await api("/api/admin/products");
     showAdmin();
   } catch (error) {
-    localStorage.removeItem(sessionKey);
+    sessionStorage.removeItem(sessionKey);
     message.textContent = "Contraseña incorrecta.";
   }
 });
@@ -1936,7 +1937,7 @@ document.querySelector("#new-product").addEventListener("click", () => {
 });
 document.querySelector("#cancel-edit").addEventListener("click", () => fillForm({ visible: true }));
 document.querySelector("#logout").addEventListener("click", () => {
-  localStorage.removeItem(sessionKey);
+  sessionStorage.removeItem(sessionKey);
   location.reload();
 });
 document.querySelector("#search-input")?.addEventListener("input", () => applyFilter(1));
@@ -1958,16 +1959,16 @@ document.querySelectorAll(".nav-item").forEach((item) => {
 
 // ─── Auto-login ───
 (async () => {
-  const saved = localStorage.getItem(sessionKey);
+  const saved = sessionStorage.getItem(sessionKey);
   if (saved) {
     try { await api("/api/admin/products"); showAdmin(); }
-    catch { localStorage.removeItem(sessionKey); }
+    catch { sessionStorage.removeItem(sessionKey); }
   }
 })();
 
 // ─── Polling: badge de pedidos pendientes cada 15s ───
 setInterval(() => {
-  if (localStorage.getItem(sessionKey)) {
+  if (sessionStorage.getItem(sessionKey)) {
     updateOrdersBadge();
 
   }
